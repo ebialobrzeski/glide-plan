@@ -143,7 +143,8 @@ def _call_openrouter(prompt: str, system: str = "", api_key_override: str = "") 
         "route": "fallback",
         "messages": messages,
         "temperature": 0.3,
-        "max_tokens": 12288,
+        "max_tokens": 15288,
+        "reasoning": {"max_tokens": 3000},
         "response_format": {"type": "json_object"},
     }
 
