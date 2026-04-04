@@ -1,0 +1,196 @@
+{% extends 'logbook/base.html' %}
+{% block title %}Loty{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="card">
+    <div class="form-row">
+        <div class="form-group">
+            <label>Data od</label>
+            <input type="date" id="dateFrom">
+        </div>
+        <div class="form-group">
+            <label>Data do</label>
+            <input type="date" id="dateTo">
+        </div>
+        <div class="form-group">
+            <label>Typ statku</label>
+            <input type="text" id="aircraftType" placeholder="np. SZD-50-3">
+        </div>
+        <div class="form-group">
+            <label>Metoda startu</label>
+            <select id="launchType">
+                <option value="">Wszystkie</option>
+                <option value="W">W — wyciągarka</option>
+                <option value="S">S — aerohol</option>
+                <option value="E">E — elektryczny</option>
+            </select>
+        </div>
+        <div class="form-group" style="justify-content:flex-end;flex-direction:row;align-items:flex-end;gap:8px">
+            <button class="btn btn-primary" onclick="loadFlights(1)"><i class="fa fa-search"></i> Szukaj</button>
+            <button class="btn btn-secondary" onclick="clearFilters()">Wyczyść</button>
+            <button class="btn btn-secondary" onclick="openManualModal()"><i class="fa fa-plus"></i> Dodaj lot</button>
+        </div>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Statek</th>
+                    <th>Rejestracja</th>
+                    <th>Start</th>
+                    <th>Lądowanie</th>
+                    <th>Czas (min)</th>
+                    <th>Zadanie</th>
+                    <th>Start</th>
+                    <th>Cena (zł)</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="flightsBody">
+                <tr><td colspan="10" class="loading"><i class="fa fa-spinner fa-spin"></i> Ładowanie…</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination">
+        <span class="page-info" id="pageInfo"></span>
+        <button class="btn btn-secondary btn-sm" id="prevBtn" onclick="changePage(-1)">‹ Wstecz</button>
+        <button class="btn btn-secondary btn-sm" id="nextBtn" onclick="changePage(1)">Dalej ›</button>
+    </div>
+</div>
+
+<!-- Manual flight modal -->
+<div id="manualModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center">
+    <div class="card" style="width:520px;max-height:90vh;overflow-y:auto;margin:0">
+        <h3 style="margin-bottom:16px">Ręczny wpis lotu</h3>
+        <div class="form-row">
+            <div class="form-group"><label>Data *</label><input type="date" id="mDate"></div>
+            <div class="form-group"><label>Metoda startu *</label>
+                <select id="mLaunch"><option value="W">W — wyciągarka</option><option value="S">S — aerohol</option><option value="E">E — elektryczny</option></select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Typ statku</label><input type="text" id="mAircraftType" placeholder="SZD-50-3"></div>
+            <div class="form-group"><label>Rejestracja</label><input type="text" id="mAircraftReg" placeholder="SP-3788"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Lotnisko startu</label><input type="text" id="mTakeoffAirport" placeholder="EPBK"></div>
+            <div class="form-group"><label>Czas startu</label><input type="time" id="mTakeoffTime"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Lotnisko lądowania</label><input type="text" id="mLandingAirport" placeholder="EPBK"></div>
+            <div class="form-group"><label>Czas lądowania</label><input type="time" id="mLandingTime"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Czas lotu (min)</label><input type="number" id="mFlightTime" min="0"></div>
+            <div class="form-group"><label>Zadanie</label><input type="text" id="mTask" placeholder="SPL / I-1"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Pilot</label><input type="text" id="mPilot"></div>
+            <div class="form-group"><label>Instruktor</label><input type="text" id="mInstructor"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:8px">
+            <button class="btn btn-primary" onclick="saveManualFlight()">Zapisz</button>
+            <button class="btn btn-secondary" onclick="closeManualModal()">Anuluj</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 1;
+let totalPages = 1;
+
+function buildParams(page) {
+    const p = new URLSearchParams();
+    if (document.getElementById('dateFrom').value) p.set('date_from', document.getElementById('dateFrom').value);
+    if (document.getElementById('dateTo').value) p.set('date_to', document.getElementById('dateTo').value);
+    if (document.getElementById('aircraftType').value) p.set('aircraft_type', document.getElementById('aircraftType').value);
+    if (document.getElementById('launchType').value) p.set('launch_type', document.getElementById('launchType').value);
+    p.set('page', page);
+    p.set('limit', 50);
+    return p;
+}
+
+async function loadFlights(page = 1) {
+    currentPage = page;
+    const tbody = document.getElementById('flightsBody');
+    tbody.innerHTML = '<tr><td colspan="10" class="loading"><i class="fa fa-spinner fa-spin"></i> Ładowanie…</td></tr>';
+
+    const resp = await fetch('/logbook/api/flights?' + buildParams(page));
+    const data = await resp.json();
+    totalPages = data.pages || 1;
+
+    if (!data.flights || data.flights.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="empty">Brak lotów</td></tr>';
+    } else {
+        tbody.innerHTML = data.flights.map(f => `
+            <tr>
+                <td>${f.date || ''}</td>
+                <td>${f.aircraft_type || ''}</td>
+                <td>${f.aircraft_reg || ''}</td>
+                <td>${f.takeoff_airport || ''} ${f.takeoff_time || ''}</td>
+                <td>${f.landing_airport || ''} ${f.landing_time || ''}</td>
+                <td>${f.flight_time_min ?? ''}</td>
+                <td>${f.task || ''}</td>
+                <td><span class="badge badge-info">${f.launch_type || ''}</span></td>
+                <td>${f.price != null ? f.price.toFixed(2) : ''}</td>
+                <td>${f.source === 'manual' ? `<button class="btn btn-danger btn-sm" onclick="deleteFlight('${f.id}')"><i class="fa fa-trash"></i></button>` : ''}</td>
+            </tr>
+        `).join('');
+    }
+
+    document.getElementById('pageInfo').textContent = `Strona ${currentPage} z ${totalPages} (${data.total} lotów łącznie)`;
+    document.getElementById('prevBtn').disabled = currentPage <= 1;
+    document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+}
+
+function changePage(dir) { if (currentPage + dir >= 1 && currentPage + dir <= totalPages) loadFlights(currentPage + dir); }
+function clearFilters() {
+    ['dateFrom','dateTo','aircraftType'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('launchType').value = '';
+    loadFlights(1);
+}
+
+async function deleteFlight(id) {
+    if (!confirm('Usunąć ten lot?')) return;
+    const resp = await fetch(`/logbook/api/flights/${id}`, { method: 'DELETE' });
+    if (resp.ok) { showToast('Lot usunięty'); loadFlights(currentPage); }
+    else { const d = await resp.json(); showToast(d.error || 'Błąd', 'error'); }
+}
+
+function openManualModal() { document.getElementById('manualModal').style.display = 'flex'; }
+function closeManualModal() { document.getElementById('manualModal').style.display = 'none'; }
+
+async function saveManualFlight() {
+    const body = {
+        date: document.getElementById('mDate').value,
+        launch_type: document.getElementById('mLaunch').value,
+        aircraft_type: document.getElementById('mAircraftType').value,
+        aircraft_reg: document.getElementById('mAircraftReg').value,
+        takeoff_airport: document.getElementById('mTakeoffAirport').value,
+        takeoff_time: document.getElementById('mTakeoffTime').value,
+        landing_airport: document.getElementById('mLandingAirport').value,
+        landing_time: document.getElementById('mLandingTime').value,
+        flight_time_min: parseInt(document.getElementById('mFlightTime').value) || null,
+        task: document.getElementById('mTask').value,
+        pilot: document.getElementById('mPilot').value,
+        instructor: document.getElementById('mInstructor').value,
+    };
+    const resp = await fetch('/logbook/api/flights/manual', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const d = await resp.json();
+    if (resp.ok) { showToast('Lot zapisany'); closeManualModal(); loadFlights(currentPage); }
+    else showToast(d.error || 'Błąd', 'error');
+}
+
+document.addEventListener('DOMContentLoaded', () => loadFlights(1));
+</script>
+{% endblock %}

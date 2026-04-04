@@ -1,0 +1,113 @@
+{% extends 'logbook/base.html' %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- KPIs -->
+<div class="kpi-grid">
+    <div class="kpi">
+        <div class="kpi-label">Łączny nalot</div>
+        <div class="kpi-value">{{ summary.total_flight_time_str }}</div>
+        <div class="kpi-sub">{{ summary.total_flights }} lotów</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Liczba lotów</div>
+        <div class="kpi-value">{{ summary.total_flights }}</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Suma kosztów</div>
+        <div class="kpi-value">{{ "%.0f"|format(summary.total_cost) }} zł</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Ostatni lot</div>
+        <div class="kpi-value" style="font-size:1.2rem">{{ summary.last_flight_date or '—' }}</div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="charts-grid">
+    <div class="card">
+        <div class="card-title">Nalot miesięczny (h)</div>
+        <canvas id="monthlyChart"
+                data-values="{{ monthly_data | tojson }}"></canvas>
+    </div>
+    <div class="card">
+        <div class="card-title">Typy statków</div>
+        <canvas id="aircraftChart"
+                data-values="{{ aircraft_data | tojson }}"></canvas>
+    </div>
+</div>
+
+<!-- Alerts -->
+{% if alerts %}
+<div class="card">
+    <div class="card-title">Alerty</div>
+    {% for alert in alerts %}
+    <div class="alert-item {{ alert.level }}">
+        {% if alert.level == 'danger' %}<i class="fa fa-circle-exclamation" style="color:var(--danger)"></i>
+        {% elif alert.level == 'warning' %}<i class="fa fa-triangle-exclamation" style="color:var(--warning)"></i>
+        {% else %}<i class="fa fa-circle-info" style="color:var(--info)"></i>{% endif %}
+        <span>{{ alert.message }}</span>
+        {% if alert.days_since > 0 %}<span class="badge badge-{{ alert.level }}" style="margin-left:auto">{{ alert.days_since }} dni</span>{% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Quick links -->
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+    <a class="btn btn-primary" href="/logbook/flights"><i class="fa fa-list"></i> Wszystkie loty</a>
+    <a class="btn btn-secondary" href="/logbook/import"><i class="fa fa-file-import"></i> Importuj loty</a>
+    <a class="btn btn-secondary" href="/logbook/connectors"><i class="fa fa-plug"></i> Zarządzaj źródłami</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Monthly bar chart
+    const monthlyEl = document.getElementById('monthlyChart');
+    const monthlyData = JSON.parse(monthlyEl.dataset.values || '[]');
+    if (monthlyData.length) {
+        new Chart(monthlyEl, {
+            type: 'bar',
+            data: {
+                labels: monthlyData.map(d => d.label),
+                datasets: [{
+                    label: 'Nalot (min)',
+                    data: monthlyData.map(d => d.minutes),
+                    backgroundColor: '#2563eb',
+                    borderRadius: 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        ticks: { callback: v => Math.floor(v/60) + 'h' },
+                        beginAtZero: true,
+                    }
+                }
+            }
+        });
+    }
+
+    // Aircraft pie chart
+    const aircraftEl = document.getElementById('aircraftChart');
+    const aircraftData = JSON.parse(aircraftEl.dataset.values || '[]');
+    if (aircraftData.length) {
+        new Chart(aircraftEl, {
+            type: 'doughnut',
+            data: {
+                labels: aircraftData.slice(0,8).map(d => d.aircraft_type || d.aircraft_reg || '?'),
+                datasets: [{
+                    data: aircraftData.slice(0,8).map(d => d.flights),
+                    backgroundColor: ['#2563eb','#7c3aed','#db2777','#ea580c','#16a34a','#0891b2','#9333ea','#64748b'],
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -35,6 +35,9 @@ ICAO_API_KEY: str = os.environ.get('ICAO_API_KEY', '')
 # Email (Resend)
 RESEND_API_KEY: str       = os.environ.get('RESEND_API_KEY', '')
 RESEND_FROM_ADDRESS: str  = os.environ.get('RESEND_FROM_ADDRESS', 'noreply@glideplan.org')
+
+# GlideLog
+GLIDELOG_SCHEDULER_ENABLED: bool = os.environ.get('GLIDELOG_SCHEDULER_ENABLED', '1').lower() in ('1', 'true', 'yes')
 # User tier limits — enforced server-side only
 TIER_LIMITS: dict = {
     'free': {

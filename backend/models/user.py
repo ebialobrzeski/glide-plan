@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, text
+from sqlalchemy import ARRAY, Boolean, Date, DateTime, ForeignKey, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -41,6 +41,12 @@ class User(TimestampMixin, Base):
     verification_code_expires: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     verification_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default='0')
     openrouter_key_enc: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # GlideLog columns (added by migration 026)
+    logbook_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default='TRUE')
+    logbook_medical_expiry: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    logbook_license_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    logbook_launch_methods: Mapped[Optional[list]] = mapped_column(ARRAY(String), nullable=True)
 
     def to_dict(self) -> dict:
         return {

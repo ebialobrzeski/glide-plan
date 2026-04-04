@@ -38,6 +38,7 @@ from backend.routes.admin import admin_bp
 from backend.routes.i18n import i18n_bp
 from backend.routes.waypoint_generation import waypoint_gen_bp
 from backend.task_planner.routes import ai_planner_bp
+from backend.routes.logbook import logbook_bp
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -75,9 +76,39 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(i18n_bp)
 app.register_blueprint(waypoint_gen_bp)
 app.register_blueprint(ai_planner_bp)
+app.register_blueprint(logbook_bp)
 
 # ── Database ─────────────────────────────────────────────────────────────────
 init_db(app)
+
+# ── GlideLog background scheduler ────────────────────────────────────────────
+from backend.config import GLIDELOG_SCHEDULER_ENABLED
+if GLIDELOG_SCHEDULER_ENABLED:
+    import os as _os
+    _is_reloader_child = _os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+    _is_production = not app.debug
+    if _is_reloader_child or _is_production:
+        try:
+            from apscheduler.schedulers.background import BackgroundScheduler
+            from backend.services.logbook.sync import sync_all_users
+            from backend.db import get_db as _get_db
+            _scheduler = BackgroundScheduler(
+                job_defaults={'coalesce': True, 'max_instances': 1}
+            )
+            @_scheduler.scheduled_job('interval', hours=24, id='glidelog_sync_all')
+            def _glidelog_sync_job():
+                _db = _get_db()
+                try:
+                    sync_all_users(_db)
+                except Exception:
+                    import logging as _log
+                    _log.getLogger(__name__).exception('GlideLog scheduled sync failed')
+            _scheduler.start()
+            import atexit
+            atexit.register(lambda: _scheduler.shutdown(wait=False))
+            app.logger.info('GlideLog scheduler started')
+        except ImportError:
+            app.logger.warning('APScheduler not installed — GlideLog background sync disabled. Run: pip install APScheduler')
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
