@@ -32,9 +32,9 @@ body {
 }
 
 .container {
-    max-width: 1400px;
+    max-width: 1600px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 12px 16px;
 }
 
 /* Header row: title centered, QR anchored to the right */
@@ -42,8 +42,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 20px;
-    padding: 16px 20px;
+    margin-bottom: 12px;
+    padding: 10px 16px;
     background: var(--surface);
     border-radius: 12px;
     box-shadow: var(--shadow);
@@ -117,10 +117,10 @@ header h1 {
 }
 
 .site-logo {
-    height: 150px;
+    height: 80px;
     width: auto;
     display: block;
-    margin: 0 auto 8px;
+    margin: 0;
 }
 
 header p {
@@ -187,10 +187,10 @@ body.view-mode #task-share-btn {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 16px;
+    padding: 6px 14px;
     background: var(--surface);
     border-radius: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 10px;
     box-shadow: var(--shadow);
 }
 
@@ -227,13 +227,13 @@ body.view-mode #task-share-btn {
 /* ──────────── Map View Sidebar Layout ──────────── */
 .map-view {
     display: flex;
-    gap: 20px;
-    height: calc(100vh - 540px);
+    gap: 12px;
+    height: calc(100vh - 320px);
     min-height: 300px;
 }
 
 .map-sidebar {
-    flex: 0 0 220px;
+    flex: 0 0 200px;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -274,13 +274,30 @@ body.view-mode #task-share-btn {
     .map-view {
         flex-direction: column;
         height: auto;
+        gap: 8px;
     }
     .map-sidebar {
         flex: none;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 4px;
+        overflow-y: visible;
+    }
+    .map-sidebar > sl-card {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .map-sidebar-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    .map-sidebar-actions sl-button {
+        width: auto;
     }
     .map-content-area .map-container {
         min-height: 350px;
-        height: calc(100vh - 400px);
+        height: calc(100vh - 300px);
     }
 }
 /* ──────────── End Map View Sidebar Layout ──────────── */
@@ -441,11 +458,11 @@ sl-tooltip {
 }
 
 #main-tabs::part(body) {
-    min-height: 500px;
+    min-height: 400px;
 }
 
 #main-tabs sl-tab-panel::part(base) {
-    padding: 20px;
+    padding: 12px;
 }
 
 /* Waypoint actions within list tab */
@@ -521,9 +538,9 @@ sl-tab-panel .waypoint-actions {
 /* Map */
 .map-container {
     /* Use viewport height minus space for header, controls, etc. */
-    height: calc(100vh - 420px);
+    height: calc(100vh - 300px);
     min-height: 400px;
-    max-height: 800px;
+    max-height: 900px;
     border-radius: 6px;
     overflow: hidden;
     width: 100%;
@@ -1044,7 +1061,7 @@ html.sl-theme-dark .text-danger { color: #f87171; }
 /* ──────────── Task Planner ──────────── */
 .task-planner {
     display: flex;
-    gap: 20px;
+    gap: 12px;
     height: calc(100vh - 200px);
     min-height: 450px;
     position: relative; /* needed for no-waypoints overlay */
@@ -1096,13 +1113,13 @@ html.sl-theme-dark .text-danger { color: #f87171; }
 /* ──────────── End No-waypoints overlay ──────────── */
 
 .task-sidebar {
-    flex: 0 0 320px;
+    flex: 0 0 300px;
     display: flex;
     flex-direction: column;
     gap: 6px;
     overflow-y: auto;
     min-height: 400px;
-    max-height: calc(100vh - 420px);
+    max-height: calc(100vh - 300px);
     padding-right: 2px;
 }
 
@@ -1848,12 +1865,13 @@ sl-input::part(prefix) {
     }
     .task-sidebar {
         flex: none;
-        height: 60vh;
-        min-height: 300px;
+        height: auto;
+        max-height: 50vh;
+        min-height: 200px;
     }
     .task-map-area .map-container {
-        min-height: 350px;
-        height: calc(100vh - 400px);
+        min-height: 300px;
+        height: calc(100vh - 350px);
     }
 }
 
@@ -1861,39 +1879,86 @@ sl-input::part(prefix) {
 
 /* Large screens */
 @media (min-width: 1400px) {
+    .container {
+        padding: 16px 20px;
+    }
     .map-container {
-        height: calc(100vh - 400px);
-        max-height: 900px;
+        max-height: 1000px;
+    }
+    .map-view {
+        height: calc(100vh - 280px);
+    }
+}
+
+/* Medium-large desktops (1080p) */
+@media (max-width: 1200px) {
+    .site-logo {
+        height: 60px;
+    }
+    .header-text h1 {
+        font-size: 1.3rem;
+    }
+    .header-text p {
+        font-size: 0.8rem;
+    }
+    .map-sidebar {
+        flex: 0 0 180px;
+    }
+    .task-sidebar {
+        flex: 0 0 280px;
     }
 }
 
 /* Medium screens (tablets) */
 @media (max-width: 1024px) {
     .container {
-        padding: 15px;
+        padding: 10px;
     }
-    
+
     .map-container {
-        height: calc(100vh - 380px);
         min-height: 350px;
     }
-    
+
+    .site-logo {
+        height: 50px;
+    }
+
     header h1 {
         font-size: 2rem;
+    }
+
+    .header-text p {
+        display: none;
+    }
+
+    .map-view {
+        gap: 8px;
+    }
+
+    .map-sidebar {
+        flex: 0 0 160px;
+    }
+
+    .task-sidebar {
+        flex: 0 0 260px;
+    }
+
+    #main-tabs sl-tab-panel::part(base) {
+        padding: 8px;
     }
 }
 
 /* Small screens (mobile) */
 @media (max-width: 768px) {
     .container {
-        padding: 10px;
+        padding: 8px;
     }
-    
+
     .map-container {
-        height: calc(100vh - 320px);
-        min-height: 300px;
+        height: calc(100vh - 200px);
+        min-height: 280px;
     }
-    
+
     header h1 {
         font-size: 1.5rem;
     }
@@ -2589,7 +2654,7 @@ html.sl-theme-dark .xcsoar-badge-as {
 }
 
 .aip-sidebar {
-    flex: 0 0 340px;
+    flex: 0 0 300px;
     overflow-y: auto;
     padding-right: 2px;
 }
@@ -3094,23 +3159,27 @@ html.sl-theme-dark .aip-history-card.active {
 
     /* Container padding */
     .container {
-        padding: 8px;
+        padding: 6px;
     }
 
     /* ── Header ── */
     .modern-header {
         flex-wrap: wrap;
-        gap: 8px;
-        padding: 10px 12px;
-        margin-bottom: 10px;
+        gap: 6px;
+        padding: 6px 10px;
+        margin-bottom: 6px;
     }
 
     .site-logo {
-        height: 36px;
+        height: 32px;
+    }
+
+    .header-brand {
+        gap: 8px;
     }
 
     .header-text h1 {
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
 
     .header-text p {
@@ -3136,8 +3205,9 @@ html.sl-theme-dark .aip-history-card.active {
 
     /* ── Status bar ── */
     .status-bar {
-        padding: 6px 10px;
-        margin-bottom: 10px;
+        padding: 4px 8px;
+        margin-bottom: 6px;
+        font-size: 0.8rem;
     }
 
     /* ── Tabs: icon-only on mobile ── */
@@ -3150,10 +3220,68 @@ html.sl-theme-dark .aip-history-card.active {
         font-size: 1rem;
     }
 
+    #main-tabs sl-tab-panel::part(base) {
+        padding: 6px;
+    }
+
+    /* ── Map View: sidebar as collapsible horizontal bar ── */
+    .map-view {
+        flex-direction: column;
+        height: auto;
+        gap: 6px;
+    }
+
+    .map-sidebar {
+        flex: none;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 4px;
+        overflow-y: visible;
+        overflow-x: auto;
+        max-height: none;
+    }
+
+    .map-sidebar > sl-card {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .map-sidebar .map-file-card,
+    .map-sidebar .map-tools-card {
+        flex: 0 1 auto;
+    }
+
+    .map-sidebar .map-file-card::part(body),
+    .map-sidebar .map-tools-card::part(body) {
+        padding: 4px 6px;
+    }
+
+    .map-sidebar-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .map-sidebar-actions sl-button {
+        width: auto;
+        flex: 0 0 auto;
+    }
+
+    /* Hide generate waypoints card on mobile by default (too large) */
+    .map-wpgen-card {
+        display: none;
+    }
+
+    /* Map takes remaining viewport */
+    .map-content-area .map-container {
+        min-height: 300px;
+        height: calc(100vh - 240px);
+    }
+
     /* ── Map toolbar ── */
     .map-toolbar {
-        padding: 8px;
-        gap: 6px;
+        padding: 6px;
+        gap: 4px;
     }
 
     .map-toolbar sl-button-group {
@@ -3161,24 +3289,18 @@ html.sl-theme-dark .aip-history-card.active {
         max-width: 100%;
     }
 
-    /* ── Map container (Map View tab) ── */
-    .map-container {
-        height: calc(100vh - 220px);
-        min-height: 280px;
-    }
-
     /* ── Task planner ── */
     .task-planner {
-        gap: 10px;
+        gap: 8px;
     }
 
     .task-sidebar {
-        max-height: 55vh;
+        max-height: 45vh;
         min-height: 0;
     }
 
     .task-map-area .map-container {
-        height: 45vh;
+        height: 50vh;
         min-height: 250px;
     }
 
@@ -3220,7 +3342,15 @@ html.sl-theme-dark .aip-history-card.active {
 @media (max-width: 480px) {
 
     .modern-header {
-        padding: 8px 10px;
+        padding: 6px 8px;
+    }
+
+    .site-logo {
+        height: 28px;
+    }
+
+    .header-text h1 {
+        font-size: 0.9rem;
     }
 
     /* Single-column export actions */
@@ -3235,11 +3365,22 @@ html.sl-theme-dark .aip-history-card.active {
 
     /* Task sidebar shorter so map is more visible */
     .task-sidebar {
-        max-height: 45vh;
+        max-height: 35vh;
     }
 
     .task-map-area .map-container {
-        height: 50vh;
+        height: 55vh;
+    }
+
+    /* Map on phones: maximize space */
+    .map-content-area .map-container {
+        height: calc(100vh - 200px);
+        min-height: 260px;
+    }
+
+    /* Hide map sidebar file card on small phones */
+    .map-sidebar .map-file-card {
+        display: none;
     }
 
     /* Browse points list: single column */
