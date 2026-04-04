@@ -1113,11 +1113,12 @@ html.sl-theme-dark .text-danger { color: #f87171; }
 /* ──────────── End No-waypoints overlay ──────────── */
 
 .task-sidebar {
-    flex: 0 0 300px;
+    flex: 0 0 320px;
     display: flex;
     flex-direction: column;
     gap: 6px;
     overflow-y: auto;
+    overflow-x: hidden;
     min-height: 400px;
     max-height: calc(100vh - 300px);
     padding-right: 2px;
@@ -1190,9 +1191,10 @@ html.sl-theme-dark .text-danger { color: #f87171; }
     display: flex;
     flex-direction: column;
     gap: 6px;
-    flex: 1 1 0;
+    flex: 1 1 auto;
     overflow-y: auto;
-    min-height: 60px;
+    overflow-x: hidden;
+    min-height: 120px;
 }
 
 .task-empty-msg {
@@ -1207,6 +1209,7 @@ html.sl-theme-dark .text-danger { color: #f87171; }
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 7px 10px;
+    flex-shrink: 0;
 }
 
 .task-point-header {
@@ -1244,7 +1247,8 @@ html.sl-theme-dark .text-danger { color: #f87171; }
 
 .task-point-actions {
     display: flex;
-    gap: 6px;
+    gap: 4px;
+    flex-wrap: wrap;
 }
 
 /* Task summary */
@@ -1905,7 +1909,7 @@ sl-input::part(prefix) {
         flex: 0 0 180px;
     }
     .task-sidebar {
-        flex: 0 0 280px;
+        flex: 0 0 300px;
     }
     .aip-sidebar {
         flex: 0 0 340px;
@@ -1946,7 +1950,11 @@ sl-input::part(prefix) {
     }
 
     .task-sidebar {
-        flex: 0 0 260px;
+        flex: 0 0 280px;
+    }
+
+    .task-sidebar .wind-fields-grid {
+        grid-template-columns: 1fr 1fr;
     }
 
     .aip-sidebar {
