@@ -1908,7 +1908,7 @@ sl-input::part(prefix) {
         flex: 0 0 280px;
     }
     .aip-sidebar {
-        flex: 0 0 290px;
+        flex: 0 0 340px;
     }
     .aip-layout {
         gap: 12px;
@@ -1950,7 +1950,7 @@ sl-input::part(prefix) {
     }
 
     .aip-sidebar {
-        flex: 0 0 260px;
+        flex: 0 0 300px;
     }
 
     .aip-field-row {
@@ -2670,7 +2670,7 @@ html.sl-theme-dark .xcsoar-badge-as {
 }
 
 .aip-sidebar {
-    flex: 0 0 320px;
+    flex: 0 0 360px;
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 2px;
