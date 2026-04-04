@@ -1120,7 +1120,7 @@ html.sl-theme-dark .text-danger { color: #f87171; }
     overflow-y: auto;
     overflow-x: hidden;
     min-height: 400px;
-    max-height: calc(100vh - 300px);
+    max-height: calc(100vh - 200px);
     padding-right: 2px;
 }
 
