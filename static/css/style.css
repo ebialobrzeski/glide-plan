@@ -228,8 +228,8 @@ body.view-mode #task-share-btn {
 .map-view {
     display: flex;
     gap: 12px;
-    height: calc(100vh - 320px);
-    min-height: 300px;
+    height: calc(100vh - 200px);
+    min-height: 450px;
 }
 
 .map-sidebar {
@@ -1888,9 +1888,6 @@ sl-input::part(prefix) {
     }
     .map-container {
         max-height: 1000px;
-    }
-    .map-view {
-        height: calc(100vh - 280px);
     }
 }
 
