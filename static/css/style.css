@@ -233,11 +233,14 @@ body.view-mode #task-share-btn {
 }
 
 .map-sidebar {
-    flex: 0 0 200px;
+    flex: 0 0 220px;
     display: flex;
     flex-direction: column;
     gap: 6px;
     overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(100vh - 200px);
+    padding-right: 2px;
 }
 
 .map-sidebar-actions {
@@ -1903,7 +1906,7 @@ sl-input::part(prefix) {
         font-size: 0.8rem;
     }
     .map-sidebar {
-        flex: 0 0 180px;
+        flex: 0 0 200px;
     }
     .task-sidebar {
         flex: 0 0 300px;
@@ -1943,7 +1946,7 @@ sl-input::part(prefix) {
     }
 
     .map-sidebar {
-        flex: 0 0 160px;
+        flex: 0 0 180px;
     }
 
     .task-sidebar {
