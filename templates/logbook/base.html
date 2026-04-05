@@ -428,9 +428,41 @@
         .progress-bar.info    { background: var(--gl-info);    }
         .progress-bar.primary { background: var(--gl-primary); }
 
+        /* ── Mobile nav toggle ────────────────────────────────────────────── */
+        .gl-nav-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--gl-topbar-text);
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 5px 8px;
+            border-radius: 6px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .gl-nav-toggle:hover { color: #fff; background: rgba(255,255,255,.08); }
+
+        /* Overlay behind open sidebar on mobile */
+        .gl-sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.45);
+            z-index: 49;
+        }
+
         /* ── Responsive ───────────────────────────────────────────────────── */
         @media (max-width: 640px) {
-            .gl-sidebar { display: none; }
+            .gl-nav-toggle { display: flex; align-items: center; }
+            .gl-sidebar {
+                transform: translateX(-100%);
+                transition: transform .25s ease;
+            }
+            .gl-sidebar.open {
+                transform: translateX(0);
+            }
+            .gl-sidebar-overlay.open { display: block; }
             .gl-main   { margin-left: 0; }
             .gl-content { padding: 16px; }
         }
@@ -508,11 +540,17 @@
     </div>
 </aside>
 
+<!-- ── Mobile sidebar overlay ─────────────────────────────────────────────── -->
+<div class="gl-sidebar-overlay" id="sidebarOverlay"></div>
+
 <!-- ── Main area ──────────────────────────────────────────────────────────── -->
 <div class="gl-main">
 
     <!-- Top bar -->
     <header class="gl-topbar">
+        <button class="gl-nav-toggle" id="navToggle" aria-label="Open menu" data-i18n-title="logbook.nav.open_menu">
+            <i class="fas fa-bars"></i>
+        </button>
         <span class="gl-topbar-title">{% block page_title %}GlideLog{% endblock %}</span>
         <div class="gl-topbar-spacer"></div>
 
@@ -572,6 +610,29 @@ function showToast(msg, type = 'success') {
     document.getElementById('toast').appendChild(t);
     setTimeout(() => t.remove(), 3500);
 }
+
+// ── Mobile sidebar toggle ───────────────────────────────────────────────────
+(function () {
+    const toggle  = document.getElementById('navToggle');
+    const sidebar = document.querySelector('.gl-sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (!toggle || !sidebar || !overlay) return;
+
+    function openSidebar()  { sidebar.classList.add('open');    overlay.classList.add('open'); }
+    function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
+
+    toggle.addEventListener('click', () => {
+        sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+    });
+    overlay.addEventListener('click', closeSidebar);
+
+    // Close when a nav link is tapped on mobile
+    sidebar.querySelectorAll('.gl-nav a, .gl-sidebar-footer a').forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 640) closeSidebar();
+        });
+    });
+})();
 
 // ── i18n bootstrap + lang selector fallback ─────────────────────────────────
 // i18n.js auto-populates #lang-selector and applies data-i18n attributes.

@@ -1,15 +1,26 @@
 {% extends 'logbook/base.html' %}
-{% block title %}Panel admina{% endblock %}
+{% block title %}<span data-i18n="logbook.admin.title">Admin panel</span>{% endblock %}
+{% block page_title %}<span data-i18n="logbook.admin.title">Admin panel</span>{% endblock %}
 
 {% block content %}
-<h2 style="font-size:1.2rem;font-weight:700;margin-bottom:20px">Panel administracyjny</h2>
-
 <div class="card">
-    <div class="card-title">Użytkownicy</div>
+    <div class="card-title" data-i18n="logbook.admin.users">Users</div>
     <div class="table-wrap">
         <table>
-            <thead><tr><th>Email</th><th>Imię</th><th>Tier</th><th>Aktywny</th><th>Loty</th><th>Nalot</th><th></th></tr></thead>
-            <tbody id="usersBody"><tr><td colspan="7" class="loading"><i class="fa fa-spinner fa-spin"></i></td></tr></tbody>
+            <thead>
+                <tr>
+                    <th data-i18n="logbook.admin.email">Email</th>
+                    <th data-i18n="logbook.admin.name">Name</th>
+                    <th data-i18n="logbook.admin.tier">Tier</th>
+                    <th data-i18n="logbook.admin.active">Active</th>
+                    <th data-i18n="logbook.admin.flights_count">Flights</th>
+                    <th data-i18n="logbook.admin.airtime">Airtime</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="usersBody">
+                <tr><td colspan="7" class="loading"><i class="fa fa-spinner fa-spin"></i></td></tr>
+            </tbody>
         </table>
     </div>
 </div>
@@ -17,6 +28,10 @@
 
 {% block scripts %}
 <script>
+function _t(key, fallback) {
+    return window.i18n ? window.i18n.t(key, fallback) : (fallback || key);
+}
+
 async function loadAdminData() {
     const [usersResp, statsResp] = await Promise.all([
         fetch('/logbook/api/admin/users'),
@@ -29,20 +44,31 @@ async function loadAdminData() {
     stats.forEach(s => { statsMap[s.user_id] = s; });
 
     const tbody = document.getElementById('usersBody');
-    if (!users.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">Brak użytkowników</td></tr>'; return; }
+    if (!users.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty">${_t('logbook.admin.no_users', 'No users')}</td></tr>`;
+        return;
+    }
     tbody.innerHTML = users.map(u => {
         const s = statsMap[u.id] || {};
         const h = Math.floor((s.minutes || 0) / 60);
         const m = (s.minutes || 0) % 60;
+        const yesLabel = _t('logbook.admin.yes', 'yes');
+        const noLabel  = _t('logbook.admin.no',  'no');
+        const deactivate = _t('logbook.admin.deactivate', 'Deactivate');
+        const activate   = _t('logbook.admin.activate',   'Activate');
         return `<tr>
             <td>${u.email}</td>
             <td>${u.display_name}</td>
             <td><span class="badge badge-info">${u.tier}</span></td>
-            <td>${u.is_active ? '<span class="badge badge-success">tak</span>' : '<span class="badge badge-danger">nie</span>'}</td>
+            <td>${u.is_active
+                ? `<span class="badge badge-success">${yesLabel}</span>`
+                : `<span class="badge badge-danger">${noLabel}</span>`}</td>
             <td>${s.flights || 0}</td>
             <td>${h}h ${m}m</td>
             <td style="display:flex;gap:6px">
-                <button class="btn btn-secondary btn-sm" onclick="toggleActive('${u.id}', ${!u.is_active})">${u.is_active ? 'Dezaktywuj' : 'Aktywuj'}</button>
+                <button class="btn btn-secondary btn-sm" onclick="toggleActive('${u.id}', ${!u.is_active})">
+                    ${u.is_active ? deactivate : activate}
+                </button>
                 <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')"><i class="fa fa-trash"></i></button>
             </td>
         </tr>`;
@@ -53,15 +79,15 @@ async function toggleActive(id, active) {
     const resp = await fetch(`/logbook/api/admin/users/${id}`, {
         method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ is_active: active })
     });
-    if (resp.ok) { showToast('Zaktualizowano'); loadAdminData(); }
-    else showToast('Błąd', 'error');
+    if (resp.ok) { showToast(_t('logbook.admin.updated', 'Updated')); loadAdminData(); }
+    else showToast('Error', 'error');
 }
 
 async function deleteUser(id) {
-    if (!confirm('Usunąć tego użytkownika i wszystkie jego dane?')) return;
+    if (!confirm(_t('logbook.btn.delete', 'Delete') + '?')) return;
     const resp = await fetch(`/logbook/api/admin/users/${id}`, { method: 'DELETE' });
-    if (resp.ok) { showToast('Usunięto'); loadAdminData(); }
-    else { const d = await resp.json(); showToast(d.error || 'Błąd', 'error'); }
+    if (resp.ok) { showToast(_t('logbook.connectors.deleted', 'Deleted')); loadAdminData(); }
+    else { const d = await resp.json(); showToast(d.error || 'Error', 'error'); }
 }
 
 document.addEventListener('DOMContentLoaded', loadAdminData);

@@ -1,21 +1,24 @@
 {% extends 'logbook/base.html' %}
-{% block title %}Źródła danych{% endblock %}
+{% block title %}<span data-i18n="logbook.nav.connectors">Sources</span>{% endblock %}
+{% block page_title %}<span data-i18n="logbook.nav.connectors">Sources</span>{% endblock %}
 
 {% block content %}
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-    <h2 style="font-size:1.2rem;font-weight:700">Źródła danych</h2>
-    <button class="btn btn-primary" onclick="openAddModal()"><i class="fa fa-plus"></i> Dodaj źródło</button>
+    <h2 style="font-size:1.2rem;font-weight:700" data-i18n="logbook.connectors.title">Data sources</h2>
+    <button class="btn btn-primary" onclick="openAddModal()">
+        <i class="fa fa-plus"></i> <span data-i18n="logbook.connectors.add_source">Add source</span>
+    </button>
 </div>
 
-<div id="connectorsList"><div class="loading"><i class="fa fa-spinner fa-spin"></i> Ładowanie…</div></div>
+<div id="connectorsList"><div class="loading"><i class="fa fa-spinner fa-spin"></i> <span data-i18n="logbook.flights.loading">Loading…</span></div></div>
 
 <!-- Add/Edit modal -->
 <div id="connModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center">
-    <div class="card" style="width:480px;margin:0">
-        <h3 id="connModalTitle" style="margin-bottom:16px">Dodaj źródło</h3>
+    <div class="card" style="width:480px;max-width:95vw;margin:0">
+        <h3 id="connModalTitle" style="margin-bottom:16px" data-i18n="logbook.connectors.add_title">Add source</h3>
         <input type="hidden" id="connId">
         <div class="form-group" style="margin-bottom:12px">
-            <label>Typ *</label>
+            <label data-i18n="logbook.connectors.type">Type *</label>
             <select id="connType" onchange="onTypeChange()">
                 <option value="echrono">eChronometraż</option>
                 <option value="leonardo">Leonardo</option>
@@ -24,26 +27,26 @@
             </select>
         </div>
         <div class="form-group" style="margin-bottom:12px">
-            <label>Nazwa wyświetlana *</label>
+            <label data-i18n="logbook.connectors.display_name">Display name *</label>
             <input type="text" id="connName" placeholder="np. Aeroklub Białostocki">
         </div>
         <div id="echronoFields">
             <div class="form-group" style="margin-bottom:12px">
-                <label>URL systemu</label>
+                <label data-i18n="logbook.connectors.url">System URL</label>
                 <input type="text" id="connUrl" placeholder="https://ab-pilot.echronometraz.pl">
             </div>
             <div class="form-group" style="margin-bottom:12px">
-                <label>Login</label>
+                <label data-i18n="logbook.connectors.login">Login</label>
                 <input type="text" id="connLogin" autocomplete="off">
             </div>
             <div class="form-group" style="margin-bottom:12px">
-                <label>Hasło</label>
+                <label data-i18n="logbook.connectors.password">Password</label>
                 <input type="password" id="connPassword" autocomplete="new-password">
             </div>
         </div>
         <div style="display:flex;gap:10px;margin-top:8px">
-            <button class="btn btn-primary" onclick="saveConnector()">Zapisz</button>
-            <button class="btn btn-secondary" onclick="closeConnModal()">Anuluj</button>
+            <button class="btn btn-primary" onclick="saveConnector()" data-i18n="logbook.btn.save">Save</button>
+            <button class="btn btn-secondary" onclick="closeConnModal()" data-i18n="logbook.btn.cancel">Cancel</button>
         </div>
     </div>
 </div>
@@ -51,12 +54,17 @@
 
 {% block scripts %}
 <script>
+function _t(key, fallback) {
+    return window.i18n ? window.i18n.t(key, fallback) : (fallback || key);
+}
+
 async function loadConnectors() {
     const resp = await fetch('/logbook/api/connectors');
     const list = await resp.json();
     const el = document.getElementById('connectorsList');
     if (!list.length) {
-        el.innerHTML = '<div class="card empty">Brak skonfigurowanych źródeł danych. <a href="#" onclick="openAddModal()">Dodaj pierwsze źródło</a>.</div>';
+        const emptyMsg = _t('logbook.connectors.empty', 'No data sources configured. Add the first source.');
+        el.innerHTML = `<div class="card empty">${emptyMsg} <a href="#" onclick="openAddModal()">${_t('logbook.connectors.add_source', 'Add source')}</a>.</div>`;
         return;
     }
     el.innerHTML = list.map(c => `
@@ -65,18 +73,18 @@ async function loadConnectors() {
                 <div style="flex:1">
                     <strong>${c.display_name}</strong>
                     <span class="badge badge-info" style="margin-left:8px">${c.type}</span>
-                    ${!c.is_active ? '<span class="badge badge-warning">nieaktywny</span>' : ''}
+                    ${!c.is_active ? `<span class="badge badge-warning">${_t('logbook.connectors.inactive', 'inactive')}</span>` : ''}
                 </div>
-                <div style="display:flex;gap:8px">
-                    <button class="btn btn-secondary btn-sm" onclick="testConn('${c.id}')"><i class="fa fa-plug"></i> Test</button>
-                    <button class="btn btn-primary btn-sm" onclick="triggerSync('${c.id}')"><i class="fa fa-rotate"></i> Sync</button>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-secondary btn-sm" onclick="testConn('${c.id}')"><i class="fa fa-plug"></i> ${_t('logbook.connectors.test', 'Test')}</button>
+                    <button class="btn btn-primary btn-sm" onclick="triggerSync('${c.id}')"><i class="fa fa-rotate"></i> ${_t('logbook.connectors.sync', 'Sync')}</button>
                     <button class="btn btn-secondary btn-sm" onclick="editConn(${JSON.stringify(c).replace(/"/g,'&quot;')})"><i class="fa fa-pen"></i></button>
                     <button class="btn btn-danger btn-sm" onclick="deleteConn('${c.id}')"><i class="fa fa-trash"></i></button>
                 </div>
             </div>
-            <div style="margin-top:8px;font-size:0.8rem;color:var(--muted)">
-                Ostatni sync: ${c.last_sync_at ? c.last_sync_at.slice(0,16).replace('T',' ') : '—'}
-                ${c.last_sync_status ? '<span class="badge badge-' + (c.last_sync_status === 'success' ? 'success' : 'danger') + '">' + c.last_sync_status + '</span>' : ''}
+            <div style="margin-top:8px;font-size:0.8rem;color:var(--gl-muted)">
+                ${_t('logbook.connectors.last_sync', 'Last sync:')} ${c.last_sync_at ? c.last_sync_at.slice(0,16).replace('T',' ') : '—'}
+                ${c.last_sync_status ? `<span class="badge badge-${c.last_sync_status === 'success' ? 'success' : 'danger'}">${c.last_sync_status}</span>` : ''}
             </div>
         </div>
     `).join('');
@@ -84,7 +92,7 @@ async function loadConnectors() {
 
 function openAddModal() {
     document.getElementById('connId').value = '';
-    document.getElementById('connModalTitle').textContent = 'Dodaj źródło';
+    document.getElementById('connModalTitle').textContent = _t('logbook.connectors.add_title', 'Add source');
     document.getElementById('connType').value = 'echrono';
     document.getElementById('connName').value = '';
     document.getElementById('connUrl').value = '';
@@ -95,7 +103,7 @@ function openAddModal() {
 
 function editConn(c) {
     document.getElementById('connId').value = c.id;
-    document.getElementById('connModalTitle').textContent = 'Edytuj źródło';
+    document.getElementById('connModalTitle').textContent = _t('logbook.connectors.edit_title', 'Edit source');
     document.getElementById('connType').value = c.type;
     document.getElementById('connName').value = c.display_name;
     document.getElementById('connUrl').value = c.base_url || '';
@@ -123,30 +131,30 @@ async function saveConnector() {
     const method = id ? 'PUT' : 'POST';
     const resp = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const d = await resp.json();
-    if (resp.ok) { showToast('Zapisano'); closeConnModal(); loadConnectors(); }
-    else showToast(d.error || 'Błąd', 'error');
+    if (resp.ok) { showToast(_t('logbook.connectors.updated', 'Updated')); closeConnModal(); loadConnectors(); }
+    else showToast(d.error || 'Error', 'error');
 }
 
 async function deleteConn(id) {
-    if (!confirm('Usunąć to źródło?')) return;
+    if (!confirm(_t('logbook.btn.delete', 'Delete') + '?')) return;
     const resp = await fetch(`/logbook/api/connectors/${id}`, { method: 'DELETE' });
-    if (resp.ok) { showToast('Usunięto'); loadConnectors(); }
-    else showToast('Błąd', 'error');
+    if (resp.ok) { showToast(_t('logbook.connectors.deleted', 'Deleted')); loadConnectors(); }
+    else showToast('Error', 'error');
 }
 
 async function testConn(id) {
-    showToast('Testowanie połączenia…');
+    showToast(_t('logbook.connectors.test', 'Test') + '…');
     const resp = await fetch(`/logbook/api/connectors/${id}/test`, { method: 'POST' });
     const d = await resp.json();
-    if (d.success) showToast('Połączenie OK', 'success');
-    else showToast(d.error || 'Połączenie nieudane', 'error');
+    if (d.success) showToast(_t('logbook.connectors.test_ok', 'Connection OK'), 'success');
+    else showToast(d.error || _t('logbook.connectors.test_fail', 'Connection failed'), 'error');
 }
 
 async function triggerSync(id) {
     const resp = await fetch(`/logbook/api/connectors/${id}/sync`, { method: 'POST' });
     const d = await resp.json();
-    if (resp.ok) showToast(d.message || 'Synchronizacja uruchomiona');
-    else showToast(d.error || 'Błąd', 'error');
+    if (resp.ok) showToast(d.message || _t('logbook.connectors.sync_started', 'Sync started'));
+    else showToast(d.error || 'Error', 'error');
 }
 
 document.addEventListener('DOMContentLoaded', loadConnectors);

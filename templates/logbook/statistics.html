@@ -268,7 +268,8 @@
 {% block scripts %}
 <script>
 /* Chart data — embedded as JS variables to avoid HTML attribute quote-escaping issues */
-const _MONTHLY_LAUNCH = {{ monthly_launch_data | tojson }};
+const _MONTHLY_LAUNCH   = {{ monthly_launch_data | tojson }};
+const _MONTHLY_AIRCRAFT = {{ monthly_aircraft_data | tojson }};
 const _AIRCRAFT_DATA  = {{ aircraft_data | tojson }};
 const _COST_DATA      = {{ monthly_data | tojson }};
 const _WEEKLY_DATA    = {{ weekly | tojson }};
@@ -302,32 +303,32 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // ── Monthly stacked bar ───────────────────────────────────────────────
-    const monthlyEl = document.getElementById('monthlyChart');
-    const lTypes    = ['W', 'S', 'E', 'other'];
-    const colours   = { W:'#2563eb', S:'#7c3aed', E:'#059669', other:'#64748b' };
-    const lLabels   = { W:'Wyciągarka', S:'Aerohol', E:'TMG', other:'Other' };
+    // ── Monthly stacked bar (by aircraft type) ────────────────────────────
+    const monthlyEl      = document.getElementById('monthlyChart');
+    const acPalette      = ['#2563eb','#7c3aed','#db2777','#ea580c','#059669','#0891b2','#9333ea','#64748b'];
 
-    if (!_MONTHLY_LAUNCH.length) {
+    if (!_MONTHLY_AIRCRAFT.length) {
         showEmpty(monthlyEl, 'No flights in this period');
     } else {
-        const { keys, labels } = buildMonthAxis(_MONTHLY_LAUNCH);
+        const { keys, labels } = buildMonthAxis(_MONTHLY_AIRCRAFT);
+        // Collect distinct aircraft types ordered by total minutes descending
+        const acTotals = {};
+        _MONTHLY_AIRCRAFT.forEach(d => { acTotals[d.aircraft_type] = (acTotals[d.aircraft_type] || 0) + d.minutes; });
+        const acTypes = Object.keys(acTotals).sort((a, b) => acTotals[b] - acTotals[a]);
         const pivot = {};
-        keys.forEach(k => { pivot[k] = { W:0, S:0, E:0, other:0 }; });
-        _MONTHLY_LAUNCH.forEach(d => {
-            const lt = lTypes.includes(d.launch_type) ? d.launch_type : 'other';
-            const k  = `${d.year}-${d.month}`;
-            if (pivot[k]) pivot[k][lt] += d.minutes;
+        keys.forEach(k => { pivot[k] = {}; acTypes.forEach(ac => { pivot[k][ac] = 0; }); });
+        _MONTHLY_AIRCRAFT.forEach(d => {
+            const k = `${d.year}-${d.month}`;
+            if (pivot[k]) pivot[k][d.aircraft_type] += d.minutes;
         });
-        const usedTypes = lTypes.filter(lt => keys.some(k => pivot[k][lt] > 0));
         new Chart(monthlyEl, {
             type: 'bar',
             data: {
                 labels,
-                datasets: usedTypes.map(lt => ({
-                    label: lLabels[lt],
-                    data: keys.map(k => pivot[k][lt]),
-                    backgroundColor: colours[lt],
+                datasets: acTypes.map((ac, i) => ({
+                    label: ac,
+                    data: keys.map(k => pivot[k][ac]),
+                    backgroundColor: acPalette[i % acPalette.length],
                     borderRadius: 3,
                 })),
             },
