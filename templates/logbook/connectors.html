@@ -1,0 +1,154 @@
+{% extends 'logbook/base.html' %}
+{% block title %}Źródła danych{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <h2 style="font-size:1.2rem;font-weight:700">Źródła danych</h2>
+    <button class="btn btn-primary" onclick="openAddModal()"><i class="fa fa-plus"></i> Dodaj źródło</button>
+</div>
+
+<div id="connectorsList"><div class="loading"><i class="fa fa-spinner fa-spin"></i> Ładowanie…</div></div>
+
+<!-- Add/Edit modal -->
+<div id="connModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center">
+    <div class="card" style="width:480px;margin:0">
+        <h3 id="connModalTitle" style="margin-bottom:16px">Dodaj źródło</h3>
+        <input type="hidden" id="connId">
+        <div class="form-group" style="margin-bottom:12px">
+            <label>Typ *</label>
+            <select id="connType" onchange="onTypeChange()">
+                <option value="echrono">eChronometraż</option>
+                <option value="leonardo">Leonardo</option>
+                <option value="weglide">WeGlide</option>
+                <option value="seeyou">SeeYou Cloud</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+            <label>Nazwa wyświetlana *</label>
+            <input type="text" id="connName" placeholder="np. Aeroklub Białostocki">
+        </div>
+        <div id="echronoFields">
+            <div class="form-group" style="margin-bottom:12px">
+                <label>URL systemu</label>
+                <input type="text" id="connUrl" placeholder="https://ab-pilot.echronometraz.pl">
+            </div>
+            <div class="form-group" style="margin-bottom:12px">
+                <label>Login</label>
+                <input type="text" id="connLogin" autocomplete="off">
+            </div>
+            <div class="form-group" style="margin-bottom:12px">
+                <label>Hasło</label>
+                <input type="password" id="connPassword" autocomplete="new-password">
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:8px">
+            <button class="btn btn-primary" onclick="saveConnector()">Zapisz</button>
+            <button class="btn btn-secondary" onclick="closeConnModal()">Anuluj</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadConnectors() {
+    const resp = await fetch('/logbook/api/connectors');
+    const list = await resp.json();
+    const el = document.getElementById('connectorsList');
+    if (!list.length) {
+        el.innerHTML = '<div class="card empty">Brak skonfigurowanych źródeł danych. <a href="#" onclick="openAddModal()">Dodaj pierwsze źródło</a>.</div>';
+        return;
+    }
+    el.innerHTML = list.map(c => `
+        <div class="card" style="margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:12px">
+                <div style="flex:1">
+                    <strong>${c.display_name}</strong>
+                    <span class="badge badge-info" style="margin-left:8px">${c.type}</span>
+                    ${!c.is_active ? '<span class="badge badge-warning">nieaktywny</span>' : ''}
+                </div>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-secondary btn-sm" onclick="testConn('${c.id}')"><i class="fa fa-plug"></i> Test</button>
+                    <button class="btn btn-primary btn-sm" onclick="triggerSync('${c.id}')"><i class="fa fa-rotate"></i> Sync</button>
+                    <button class="btn btn-secondary btn-sm" onclick="editConn(${JSON.stringify(c).replace(/"/g,'&quot;')})"><i class="fa fa-pen"></i></button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteConn('${c.id}')"><i class="fa fa-trash"></i></button>
+                </div>
+            </div>
+            <div style="margin-top:8px;font-size:0.8rem;color:var(--muted)">
+                Ostatni sync: ${c.last_sync_at ? c.last_sync_at.slice(0,16).replace('T',' ') : '—'}
+                ${c.last_sync_status ? '<span class="badge badge-' + (c.last_sync_status === 'success' ? 'success' : 'danger') + '">' + c.last_sync_status + '</span>' : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function openAddModal() {
+    document.getElementById('connId').value = '';
+    document.getElementById('connModalTitle').textContent = 'Dodaj źródło';
+    document.getElementById('connType').value = 'echrono';
+    document.getElementById('connName').value = '';
+    document.getElementById('connUrl').value = '';
+    document.getElementById('connLogin').value = '';
+    document.getElementById('connPassword').value = '';
+    document.getElementById('connModal').style.display = 'flex';
+}
+
+function editConn(c) {
+    document.getElementById('connId').value = c.id;
+    document.getElementById('connModalTitle').textContent = 'Edytuj źródło';
+    document.getElementById('connType').value = c.type;
+    document.getElementById('connName').value = c.display_name;
+    document.getElementById('connUrl').value = c.base_url || '';
+    document.getElementById('connLogin').value = '';
+    document.getElementById('connPassword').value = '';
+    document.getElementById('connModal').style.display = 'flex';
+}
+
+function closeConnModal() { document.getElementById('connModal').style.display = 'none'; }
+function onTypeChange() {
+    const t = document.getElementById('connType').value;
+    document.getElementById('echronoFields').style.display = t === 'echrono' ? '' : 'none';
+}
+
+async function saveConnector() {
+    const id = document.getElementById('connId').value;
+    const body = {
+        type: document.getElementById('connType').value,
+        display_name: document.getElementById('connName').value,
+        base_url: document.getElementById('connUrl').value || null,
+        login: document.getElementById('connLogin').value || undefined,
+        password: document.getElementById('connPassword').value || undefined,
+    };
+    const url = id ? `/logbook/api/connectors/${id}` : '/logbook/api/connectors';
+    const method = id ? 'PUT' : 'POST';
+    const resp = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const d = await resp.json();
+    if (resp.ok) { showToast('Zapisano'); closeConnModal(); loadConnectors(); }
+    else showToast(d.error || 'Błąd', 'error');
+}
+
+async function deleteConn(id) {
+    if (!confirm('Usunąć to źródło?')) return;
+    const resp = await fetch(`/logbook/api/connectors/${id}`, { method: 'DELETE' });
+    if (resp.ok) { showToast('Usunięto'); loadConnectors(); }
+    else showToast('Błąd', 'error');
+}
+
+async function testConn(id) {
+    showToast('Testowanie połączenia…');
+    const resp = await fetch(`/logbook/api/connectors/${id}/test`, { method: 'POST' });
+    const d = await resp.json();
+    if (d.success) showToast('Połączenie OK', 'success');
+    else showToast(d.error || 'Połączenie nieudane', 'error');
+}
+
+async function triggerSync(id) {
+    const resp = await fetch(`/logbook/api/connectors/${id}/sync`, { method: 'POST' });
+    const d = await resp.json();
+    if (resp.ok) showToast(d.message || 'Synchronizacja uruchomiona');
+    else showToast(d.error || 'Błąd', 'error');
+}
+
+document.addEventListener('DOMContentLoaded', loadConnectors);
+</script>
+{% endblock %}

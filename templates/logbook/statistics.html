@@ -1,0 +1,411 @@
+{% extends 'logbook/base.html' %}
+{% block title %}<span data-i18n="logbook.nav.statistics">Statistics</span>{% endblock %}
+{% block page_title %}<span data-i18n="logbook.stats.page_title">Statistics &amp; Highlights</span>{% endblock %}
+
+{% block head %}
+<style>
+.stats-grid   { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:14px; margin-bottom:20px; }
+.two-col      { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:16px; }
+.three-col    { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:16px; }
+@media(max-width:900px){.two-col,.three-col{grid-template-columns:1fr;}}
+.season-badge { display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:rgba(37,99,235,.12);color:var(--gl-primary);font-size:0.78rem;font-weight:600;margin-bottom:18px;border:1px solid rgba(37,99,235,.2); }
+.filter-form { display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:18px; }
+.filter-form input[type=date] { background:var(--gl-surface);border:1px solid var(--gl-border);border-radius:6px;padding:5px 10px;color:var(--gl-text);font-size:0.82rem; }
+.fact-item    { margin-bottom:16px; }
+.fact-value   { font-size:1.8rem;font-weight:700;color:var(--gl-text);line-height:1.1; }
+.fact-label   { font-size:0.75rem;color:var(--gl-muted);margin-top:2px; }
+.instructor-row  { display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gl-border); }
+.instructor-row:last-child{border-bottom:none;}
+.instructor-avatar{width:34px;height:34px;border-radius:50%;background:var(--gl-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;flex-shrink:0;}
+.instructor-name{flex:1;font-size:0.875rem;font-weight:500;}
+.instructor-count{font-size:0.8rem;color:var(--gl-muted);}
+.flight-time-bar{height:4px;background:var(--gl-primary);border-radius:2px;margin-top:4px;transition:width .4s;}
+/* Weekly activity grid */
+.week-grid    { display:flex;gap:3px;flex-wrap:wrap;margin-top:8px; }
+.week-day     { width:14px;height:14px;border-radius:3px;background:var(--gl-border); }
+.week-day.d1  { background:rgba(37,99,235,.25); }
+.week-day.d2  { background:rgba(37,99,235,.5);  }
+.week-day.d3  { background:rgba(37,99,235,.75); }
+.week-day.d4  { background:rgba(37,99,235,1);   }
+/* Alert summary strip */
+.alert-strip { display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;font-size:0.82rem;margin-bottom:6px; }
+.alert-strip.success { background:rgba(22,163,74,.08); color:var(--gl-success); border:1px solid rgba(22,163,74,.2); }
+.alert-strip.warning { background:rgba(217,119,6,.08); color:var(--gl-warning); border:1px solid rgba(217,119,6,.2); }
+.alert-strip.danger  { background:rgba(220,38,38,.08); color:var(--gl-danger);  border:1px solid rgba(220,38,38,.2); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Date filter form -->
+<form method="get" class="filter-form">
+    <span style="font-size:0.78rem;color:var(--gl-muted);font-weight:600" data-i18n="logbook.filter.range">Date range:</span>
+    <input type="date" name="date_from" value="{{ date_from_str }}" placeholder="From">
+    <input type="date" name="date_to"   value="{{ date_to_str }}"   placeholder="To">
+    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter"></i> <span data-i18n="logbook.filter.apply">Apply</span></button>
+    {% if is_filtered %}
+    <a href="/logbook/statistics" class="btn btn-secondary btn-sm"><i class="fas fa-xmark"></i> <span data-i18n="logbook.filter.all_time">All time</span></a>
+    {% endif %}
+    <!-- Quick season presets -->
+    <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+        <a href="?date_from={{ season_year - 1 }}-04-01&date_to={{ season_year - 1 }}-10-31" class="btn btn-ghost btn-sm">{{ season_year - 1 }}</a>
+        <a href="?date_from={{ season_year }}-04-01&date_to={{ season_year }}-10-31" class="btn btn-ghost btn-sm">{{ season_year }}</a>
+        {% if not is_filtered %}<span style="font-size:0.72rem;color:var(--gl-primary);font-weight:600">&#x2022; All time</span>{% endif %}
+    </div>
+</form>
+
+<div class="season-badge">
+    {% if is_filtered %}
+    <i class="fas fa-filter"></i>
+    {{ date_from_str }} &ndash; {{ date_to_str }}
+    {% else %}
+    <i class="fas fa-chart-bar"></i>
+    <span data-i18n="logbook.stats.all_time">All time</span> &middot;
+    {{ summary.total_flights }} <span data-i18n="logbook.kpi.flights">flights</span>
+    {% endif %}
+</div>
+
+<!-- KPI strip -->
+<div class="stats-grid">
+    <div class="kpi">
+        <div class="kpi-label" data-i18n="logbook.kpi.total_flight_time">Total flight time</div>
+        <div class="kpi-value">{{ period.total_flight_time_str }}</div>
+        <div class="kpi-sub">{{ period.total_flights }} <span data-i18n="logbook.kpi.flights">flights</span></div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label" data-i18n="logbook.kpi.avg_flight">Avg flight</div>
+        <div class="kpi-value" style="font-size:1.4rem">{{ period.avg_flight_str }}</div>
+        <div class="kpi-sub"><span data-i18n="logbook.kpi.longest">longest</span>: {{ period.max_flight_str }}</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label" data-i18n="logbook.kpi.total_cost">Total cost</div>
+        <div class="kpi-value" style="font-size:1.4rem">{{ "%.0f"|format(period.total_cost) }} z&#322;</div>
+        {% if period.total_flights %}
+        <div class="kpi-sub">&oslash; {{ "%.0f"|format(period.total_cost / period.total_flights) }} <span data-i18n="logbook.kpi.per_flight">/ flight</span></div>
+        {% endif %}
+    </div>
+    <div class="kpi">
+        <div class="kpi-label" data-i18n="logbook.kpi.flying_days">Flying days</div>
+        <div class="kpi-value">{{ period.flying_days }}</div>
+        <div class="kpi-sub">{% if is_filtered %}in range{% else %}<span data-i18n="logbook.kpi.all_time">all time</span>{% endif %}</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label" data-i18n="logbook.kpi.aircraft">Aircraft</div>
+        <div class="kpi-value">{{ period.aircraft_count }}</div>
+        <div class="kpi-sub">{{ period.aircraft_types }} <span data-i18n="logbook.kpi.types">types</span></div>
+    </div>
+</div>
+
+<!-- Charts row -->
+<div class="two-col">
+    <!-- Monthly stacked bar -->
+    <div class="card">
+        <div class="card-title" data-i18n="logbook.stats.monthly_airtime">Monthly airtime (minutes)</div>
+        <canvas id="monthlyChart" height="180"></canvas>
+    </div>
+    <!-- Aircraft doughnut -->
+    <div class="card">
+        <div class="card-title" data-i18n="logbook.stats.by_aircraft">By aircraft</div>
+        <canvas id="aircraftChart" height="180"></canvas>
+    </div>
+</div>
+
+<!-- Cost chart -->
+<div class="card" style="margin-bottom:16px">
+    <div class="card-title" data-i18n="logbook.stats.monthly_cost">Monthly cost (z&#322;)</div>
+    <canvas id="costChart" height="120"></canvas>
+</div>
+
+<!-- Scatter + cost histogram row -->
+<div class="two-col">
+    <!-- Longest flights -->
+    <div class="card">
+        <div class="card-title" data-i18n="logbook.stats.longest_flights">Longest flights this season</div>
+        <table>
+            <thead>
+                <tr>
+                    <th data-i18n="logbook.tbl.duration">Duration</th>
+                    <th data-i18n="logbook.tbl.date">Date</th>
+                    <th data-i18n="logbook.tbl.aircraft">Aircraft</th>
+                    <th data-i18n="logbook.tbl.task">Task</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in top_flights %}
+                <tr>
+                    <td><strong>{{ f.h }}h {{ '%02d'|format(f.m) }}m</strong></td>
+                    <td>{{ f.date }}</td>
+                    <td>{{ f.aircraft_reg or f.aircraft_type or '—' }}</td>
+                    <td>{{ f.task or '—' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="empty" data-i18n="logbook.empty.no_flights">No flights recorded</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Fun facts -->
+    <div class="card">
+        <div class="card-title" data-i18n="logbook.stats.highlights">Highlights</div>
+        {% if facts.estimated_km %}
+        <div class="fact-item">
+            <div class="fact-value">{{ facts.estimated_km }} km</div>
+            <div class="fact-label" data-i18n="logbook.stats.estimated_distance">estimated distance in the air this season</div>
+        </div>
+        {% endif %}
+        {% if facts.favourite_hour %}
+        <div class="fact-item">
+            <div class="fact-value">{{ facts.favourite_hour }}</div>
+            <div class="fact-label" data-i18n="logbook.stats.fav_takeoff">favourite take-off time (most common)</div>
+        </div>
+        {% endif %}
+        {% if facts.most_active_date %}
+        <div class="fact-item">
+            <div class="fact-value">{{ facts.most_active_date }}</div>
+            <div class="fact-label"><span data-i18n="logbook.stats.most_active_day">busiest day</span> &middot; {{ facts.most_active_count }} <span data-i18n="logbook.kpi.flights">flights</span></div>
+        </div>
+        {% endif %}
+        {% if facts.first_task %}
+        <div class="fact-item">
+            <div class="fact-value">{{ facts.first_task }}</div>
+            <div class="fact-label" data-i18n="logbook.stats.first_task">first task of the season</div>
+            {% if facts.first_task_date %}<div class="fact-label" style="margin-top:1px">{{ facts.first_task_date }}</div>{% endif %}
+        </div>
+        {% endif %}
+        {% if not facts.estimated_km and not facts.favourite_hour %}
+        <div class="empty" data-i18n="logbook.empty.no_data">Not enough data yet</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Instructors + Winch ops + Alerts row -->
+<div class="three-col">
+    <!-- Instructors -->
+    <div class="card">
+        <div class="card-title" data-i18n="logbook.stats.instructors">Instructors</div>
+        {% if instructors %}
+        {% set max_flights = instructors[0].flights %}
+        {% for fi in instructors[:5] %}
+        <div class="instructor-row">
+            <div class="instructor-avatar">
+                {{ fi.instructor[:2].upper() if fi.instructor else '?' }}
+            </div>
+            <div style="flex:1">
+                <div class="instructor-name">{{ fi.instructor }}</div>
+                <div class="flight-time-bar" style="width:{{ (fi.flights / max_flights * 100)|int }}%"></div>
+            </div>
+            <div class="instructor-count">{{ fi.flights }}</div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty" data-i18n="logbook.empty.no_instructors">No instructor flights recorded</div>
+        {% endif %}
+    </div>
+
+    <!-- Winch operators -->
+    <div class="card">
+        <div class="card-title" data-i18n="logbook.stats.winch_ops">Winch Operators</div>
+        {% if winch_ops %}
+        {% set max_launches = winch_ops[0].launches %}
+        {% for op in winch_ops[:5] %}
+        <div class="instructor-row">
+            <div class="instructor-avatar" style="background:var(--gl-success)">
+                {{ op.operator[:2].upper() if op.operator else '?' }}
+            </div>
+            <div style="flex:1">
+                <div class="instructor-name">{{ op.operator }}</div>
+                <div class="flight-time-bar" style="width:{{ (op.launches / max_launches * 100)|int }}%;background:var(--gl-success)"></div>
+            </div>
+            <div class="instructor-count">{{ op.launches }}</div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty" data-i18n="logbook.empty.no_winch_ops">No winch launch data</div>
+        {% endif %}
+    </div>
+
+    <!-- Licence alerts strip -->
+    <div class="card">
+        <div class="card-title" data-i18n="logbook.stats.licence_alerts">Licence Alerts</div>
+        {% if alerts %}
+        {% for a in alerts[:6] %}
+        <div class="alert-strip {{ a.level }}">
+            {% if a.level == 'success' %}<i class="fas fa-circle-check"></i>
+            {% elif a.level == 'danger' %}<i class="fas fa-circle-exclamation"></i>
+            {% elif a.level == 'warning' %}<i class="fas fa-triangle-exclamation"></i>
+            {% else %}<i class="fas fa-circle-info"></i>{% endif %}
+            {{ a.title }}
+            {% if a.days %}<span style="margin-left:auto;font-size:0.75rem">{{ a.days }}d</span>{% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty" data-i18n="logbook.empty.no_alerts">No active alerts</div>
+        {% endif %}
+        <a class="btn btn-ghost btn-sm" style="margin-top:8px" href="/logbook/licenses">
+            <i class="fas fa-id-card"></i> <span data-i18n="logbook.stats.view_licenses">View licenses</span>
+        </a>
+    </div>
+</div>
+
+<!-- Weekly activity heatmap -->
+<div class="card">
+    <div class="card-title" data-i18n="logbook.stats.weekly_activity">Weekly activity — flight starts (last 26 weeks)</div>
+    <div class="week-grid" id="weekGrid"></div>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:0.72rem;color:var(--gl-muted)">
+        <span data-i18n="logbook.stats.less">Less</span>
+        <span class="week-day"></span>
+        <span class="week-day d1"></span>
+        <span class="week-day d2"></span>
+        <span class="week-day d3"></span>
+        <span class="week-day d4"></span>
+        <span data-i18n="logbook.stats.more">More</span>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Chart data — embedded as JS variables to avoid HTML attribute quote-escaping issues */
+const _MONTHLY_LAUNCH = {{ monthly_launch_data | tojson }};
+const _AIRCRAFT_DATA  = {{ aircraft_data | tojson }};
+const _COST_DATA      = {{ monthly_data | tojson }};
+const _WEEKLY_DATA    = {{ weekly | tojson }};
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const MONTH_NAMES = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    function showEmpty(el, msg) {
+        el.style.display = 'none';
+        const p = document.createElement('p');
+        p.textContent = msg || 'No data available';
+        p.style.cssText = 'color:var(--gl-muted);font-size:0.875rem;text-align:center;padding:32px 0;margin:0';
+        el.parentNode.appendChild(p);
+    }
+
+    function buildMonthAxis(rows) {
+        const seen = new Set(), ordered = [];
+        [...rows].sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month)
+                 .forEach(r => {
+                     const k = `${r.year}-${r.month}`;
+                     if (!seen.has(k)) { seen.add(k); ordered.push({ key: k, year: r.year, month: r.month }); }
+                 });
+        const multiYear = new Set(ordered.map(o => o.year)).size > 1;
+        return {
+            keys:   ordered.map(o => o.key),
+            labels: ordered.map(o => multiYear
+                ? `${MONTH_NAMES[o.month]} '${String(o.year).slice(2)}`
+                : MONTH_NAMES[o.month]),
+        };
+    }
+
+    // ── Monthly stacked bar ───────────────────────────────────────────────
+    const monthlyEl = document.getElementById('monthlyChart');
+    const lTypes    = ['W', 'S', 'E', 'other'];
+    const colours   = { W:'#2563eb', S:'#7c3aed', E:'#059669', other:'#64748b' };
+    const lLabels   = { W:'Wyciągarka', S:'Aerohol', E:'TMG', other:'Other' };
+
+    if (!_MONTHLY_LAUNCH.length) {
+        showEmpty(monthlyEl, 'No flights in this period');
+    } else {
+        const { keys, labels } = buildMonthAxis(_MONTHLY_LAUNCH);
+        const pivot = {};
+        keys.forEach(k => { pivot[k] = { W:0, S:0, E:0, other:0 }; });
+        _MONTHLY_LAUNCH.forEach(d => {
+            const lt = lTypes.includes(d.launch_type) ? d.launch_type : 'other';
+            const k  = `${d.year}-${d.month}`;
+            if (pivot[k]) pivot[k][lt] += d.minutes;
+        });
+        const usedTypes = lTypes.filter(lt => keys.some(k => pivot[k][lt] > 0));
+        new Chart(monthlyEl, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: usedTypes.map(lt => ({
+                    label: lLabels[lt],
+                    data: keys.map(k => pivot[k][lt]),
+                    backgroundColor: colours[lt],
+                    borderRadius: 3,
+                })),
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position:'top', labels:{ font:{size:11}, boxWidth:12 } } },
+                scales: {
+                    x: { stacked: true, ticks:{ maxRotation:45 } },
+                    y: { stacked: true, beginAtZero: true, ticks:{ callback: v => Math.floor(v/60)+'h' } },
+                },
+            },
+        });
+    }
+
+    // ── Aircraft doughnut ─────────────────────────────────────────────────
+    const aircraftEl = document.getElementById('aircraftChart');
+    if (!_AIRCRAFT_DATA.length) {
+        showEmpty(aircraftEl, 'No aircraft data');
+    } else {
+        const palette = ['#2563eb','#7c3aed','#db2777','#ea580c','#059669','#0891b2','#9333ea','#64748b'];
+        const total   = _AIRCRAFT_DATA.reduce((s, d) => s + d.flights, 0);
+        new Chart(aircraftEl, {
+            type: 'doughnut',
+            data: {
+                labels: _AIRCRAFT_DATA.slice(0,8).map(d => {
+                    const name = d.aircraft_type || d.aircraft_reg || '?';
+                    const pct  = total ? Math.round(d.flights / total * 100) : 0;
+                    return `${name} · ${pct}%`;
+                }),
+                datasets: [{ data: _AIRCRAFT_DATA.slice(0,8).map(d => d.flights), backgroundColor: palette }],
+            },
+            options: { responsive: true, plugins: { legend: { position:'bottom', labels:{ font:{size:11}, boxWidth:12 } } } },
+        });
+    }
+
+    // ── Monthly cost bar ──────────────────────────────────────────────────
+    const costEl = document.getElementById('costChart');
+    if (!_COST_DATA.length) {
+        if (costEl) showEmpty(costEl, 'No cost data');
+    } else {
+        const { keys: cKeys, labels: cLabels } = buildMonthAxis(_COST_DATA);
+        const cMap = {};
+        _COST_DATA.forEach(d => { cMap[`${d.year}-${d.month}`] = d.cost; });
+        new Chart(costEl, {
+            type: 'bar',
+            data: {
+                labels: cLabels,
+                datasets: [{ label:'Cost (zł)', data: cKeys.map(k => cMap[k]||0), backgroundColor:'#0891b2', borderRadius:3 }],
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid:{ display:false }, ticks:{ maxRotation:45 } },
+                    y: { beginAtZero: true, ticks:{ callback: v => v+' zł' } },
+                },
+            },
+        });
+    }
+
+    // ── Weekly activity grid ──────────────────────────────────────────────
+    const byDate = {};
+    _WEEKLY_DATA.forEach(d => { byDate[d.date] = d.flights; });
+
+    const grid  = document.getElementById('weekGrid');
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(start.getDate() - 26 * 7);
+    start.setDate(start.getDate() - start.getDay());
+
+    for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+        const iso   = d.toISOString().slice(0, 10);
+        const count = byDate[iso] || 0;
+        const cell  = document.createElement('div');
+        cell.className = 'week-day' + (count >= 4 ? ' d4' : count >= 3 ? ' d3' : count >= 2 ? ' d2' : count >= 1 ? ' d1' : '');
+        cell.title = `${iso}: ${count} flight${count !== 1 ? 's' : ''}`;
+        grid.appendChild(cell);
+    }
+});
+</script>
+{% endblock %}

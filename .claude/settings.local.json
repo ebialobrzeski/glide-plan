@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh issue:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:objects.githubusercontent.com)",
+      "Bash(grep -r \"Blueprint\" /c/Work/GitHub/soaring_cup_web/backend/routes/*.py)",
+      "Bash(pip install:*)",
+      "Bash(pip show:*)",
+      "Bash(python -c ':*)",
+      "Bash(py -m pip install APScheduler httpx beautifulsoup4 openpyxl)",
+      "Bash(py -c \"import apscheduler; print\\(apscheduler.__version__\\)\")",
+      "Bash(py -c \"import app\")",
+      "Bash(grep -v \"^d.*\\\\\\\\.venv\")"
+    ]
+  }
+}

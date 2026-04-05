@@ -4,16 +4,27 @@ from __future__ import annotations
 from functools import wraps
 from typing import Callable
 
-from flask import jsonify
+from flask import jsonify, redirect, request, url_for
 from flask_login import current_user
 
 
 def login_required(f: Callable) -> Callable:
-    """Return 401 if the request is not authenticated."""
+    """Return 401 JSON if the request is not authenticated. Use for API routes."""
     @wraps(f)
     def decorated(*args, **kwargs):
         if not current_user.is_authenticated:
             return jsonify({'error': 'Authentication required.'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
+def page_login_required(f: Callable) -> Callable:
+    """Redirect to login page if the request is not authenticated. Use for HTML page routes."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated:
+            next_url = request.url
+            return redirect(f'/?login=1&next={next_url}')
         return f(*args, **kwargs)
     return decorated
 

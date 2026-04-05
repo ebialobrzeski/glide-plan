@@ -1,0 +1,64 @@
+{% extends 'logbook/base.html' %}
+{% block title %}Ustawienia{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-title">Profil pilota</div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Ważność orzeczenia lekarskiego</label>
+            <input type="date" id="medicalExpiry">
+        </div>
+        <div class="form-group">
+            <label>Data uzyskania licencji SPL</label>
+            <input type="date" id="licenseDate">
+        </div>
+    </div>
+    <button class="btn btn-primary" onclick="saveProfile()"><i class="fa fa-floppy-disk"></i> Zapisz</button>
+</div>
+
+<div class="card">
+    <div class="card-title">Synchronizacja</div>
+    <p style="color:var(--muted);font-size:.875rem;margin-bottom:16px">
+        Aby zsynchronizować loty, skonfiguruj połączenie na stronie
+        <a href="/logbook/connectors">Źródła danych</a>.
+    </p>
+    <div id="syncStatus" style="margin-bottom:16px;font-size:.875rem;color:var(--muted)">Ładowanie statusu…</div>
+    <button class="btn btn-primary" onclick="triggerAllSync()"><i class="fa fa-rotate"></i> Synchronizuj teraz</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadSyncStatus() {
+    const resp = await fetch('/logbook/api/sync/status');
+    const d = await resp.json();
+    const el = document.getElementById('syncStatus');
+    if (d.last_sync) {
+        const s = d.last_sync;
+        el.innerHTML = `Ostatnia synchronizacja: <strong>${s.started_at ? s.started_at.slice(0,16).replace('T',' ') : '—'}</strong>
+            <span class="badge badge-${s.status === 'success' ? 'success' : 'danger'}">${s.status}</span>
+            ${s.message ? '— ' + s.message : ''}`;
+    } else {
+        el.textContent = 'Brak danych o synchronizacji.';
+    }
+}
+
+async function triggerAllSync() {
+    const resp = await fetch('/logbook/api/connectors');
+    const connectors = await resp.json();
+    if (!connectors.length) { showToast('Brak skonfigurowanych źródeł danych', 'error'); return; }
+    for (const c of connectors.filter(c => c.is_active)) {
+        await fetch(`/logbook/api/connectors/${c.id}/sync`, { method: 'POST' });
+    }
+    showToast('Synchronizacja uruchomiona');
+    setTimeout(loadSyncStatus, 2000);
+}
+
+async function saveProfile() {
+    showToast('Funkcja w przygotowaniu');
+}
+
+document.addEventListener('DOMContentLoaded', loadSyncStatus);
+</script>
+{% endblock %}
