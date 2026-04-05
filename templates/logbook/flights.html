@@ -1,35 +1,42 @@
 {% extends 'logbook/base.html' %}
-{% block title %}Loty{% endblock %}
+{% block title %}<span data-i18n="logbook.flights.page_title">Flights</span>{% endblock %}
+{% block page_title %}<span data-i18n="logbook.flights.page_title">Flights</span>{% endblock %}
 
 {% block content %}
 <!-- Filters -->
 <div class="card">
     <div class="form-row">
         <div class="form-group">
-            <label>Data od</label>
+            <label data-i18n="logbook.flights.date_from">Date from</label>
             <input type="date" id="dateFrom">
         </div>
         <div class="form-group">
-            <label>Data do</label>
+            <label data-i18n="logbook.flights.date_to">Date to</label>
             <input type="date" id="dateTo">
         </div>
         <div class="form-group">
-            <label>Typ statku</label>
-            <input type="text" id="aircraftType" placeholder="np. SZD-50-3">
+            <label data-i18n="logbook.flights.aircraft_type">Aircraft type</label>
+            <input type="text" id="aircraftType" data-i18n-placeholder="logbook.flights.aircraft_type" placeholder="Aircraft type">
         </div>
         <div class="form-group">
-            <label>Metoda startu</label>
+            <label data-i18n="logbook.flights.launch_method">Launch method</label>
             <select id="launchType">
-                <option value="">Wszystkie</option>
-                <option value="W">W — wyciągarka</option>
-                <option value="S">S — aerohol</option>
-                <option value="E">E — elektryczny</option>
+                <option value="" data-i18n="logbook.flights.all">All</option>
+                <option value="W" data-i18n="logbook.flights.winch">W — winch</option>
+                <option value="S" data-i18n="logbook.flights.aerotow">S — aerotow</option>
+                <option value="E" data-i18n="logbook.flights.electric">E — electric/motor</option>
             </select>
         </div>
         <div class="form-group" style="justify-content:flex-end;flex-direction:row;align-items:flex-end;gap:8px">
-            <button class="btn btn-primary" onclick="loadFlights(1)"><i class="fa fa-search"></i> Szukaj</button>
-            <button class="btn btn-secondary" onclick="clearFilters()">Wyczyść</button>
-            <button class="btn btn-secondary" onclick="openManualModal()"><i class="fa fa-plus"></i> Dodaj lot</button>
+            <button class="btn btn-primary" onclick="loadFlights(1)">
+                <i class="fa fa-search"></i> <span data-i18n="logbook.flights.search">Search</span>
+            </button>
+            <button class="btn btn-secondary" onclick="clearFilters()">
+                <span data-i18n="logbook.flights.clear">Clear</span>
+            </button>
+            <button class="btn btn-secondary" onclick="openManualModal()">
+                <i class="fa fa-plus"></i> <span data-i18n="logbook.flights.add_flight">Add flight</span>
+            </button>
         </div>
     </div>
 </div>
@@ -40,63 +47,101 @@
         <table>
             <thead>
                 <tr>
-                    <th>Data</th>
-                    <th>Statek</th>
-                    <th>Rejestracja</th>
-                    <th>Start</th>
-                    <th>Lądowanie</th>
-                    <th>Czas (min)</th>
-                    <th>Zadanie</th>
-                    <th>Start</th>
-                    <th>Cena (zł)</th>
+                    <th data-i18n="logbook.tbl.date">Date</th>
+                    <th data-i18n="logbook.tbl.aircraft">Aircraft</th>
+                    <th data-i18n="logbook.flights.registration">Registration</th>
+                    <th data-i18n="logbook.tbl.takeoff">Take-off</th>
+                    <th data-i18n="logbook.tbl.landing">Landing</th>
+                    <th data-i18n="logbook.flights.duration_min">Duration (min)</th>
+                    <th data-i18n="logbook.tbl.task">Task</th>
+                    <th data-i18n="logbook.tbl.launch">Launch</th>
+                    <th data-i18n="logbook.tbl.price">Price (zł)</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody id="flightsBody">
-                <tr><td colspan="10" class="loading"><i class="fa fa-spinner fa-spin"></i> Ładowanie…</td></tr>
+                <tr><td colspan="10" class="loading"><i class="fa fa-spinner fa-spin"></i> <span data-i18n="logbook.flights.loading">Loading…</span></td></tr>
             </tbody>
         </table>
     </div>
     <div class="pagination">
         <span class="page-info" id="pageInfo"></span>
-        <button class="btn btn-secondary btn-sm" id="prevBtn" onclick="changePage(-1)">‹ Wstecz</button>
-        <button class="btn btn-secondary btn-sm" id="nextBtn" onclick="changePage(1)">Dalej ›</button>
+        <button class="btn btn-secondary btn-sm" id="prevBtn" onclick="changePage(-1)" data-i18n="logbook.flights.prev">‹ Prev</button>
+        <button class="btn btn-secondary btn-sm" id="nextBtn" onclick="changePage(1)" data-i18n="logbook.flights.next">Next ›</button>
     </div>
 </div>
 
 <!-- Manual flight modal -->
 <div id="manualModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center">
-    <div class="card" style="width:520px;max-height:90vh;overflow-y:auto;margin:0">
-        <h3 style="margin-bottom:16px">Ręczny wpis lotu</h3>
+    <div class="card" style="width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;margin:0">
+        <h3 id="modalTitle" style="margin-bottom:16px" data-i18n="logbook.flights.add_modal_title">Add flight manually</h3>
         <div class="form-row">
-            <div class="form-group"><label>Data *</label><input type="date" id="mDate"></div>
-            <div class="form-group"><label>Metoda startu *</label>
-                <select id="mLaunch"><option value="W">W — wyciągarka</option><option value="S">S — aerohol</option><option value="E">E — elektryczny</option></select>
+            <div class="form-group">
+                <label><span data-i18n="logbook.tbl.date">Date</span> *</label>
+                <input type="date" id="mDate">
+            </div>
+            <div class="form-group">
+                <label><span data-i18n="logbook.flights.launch_method">Launch method</span> *</label>
+                <select id="mLaunch">
+                    <option value="W" data-i18n="logbook.flights.winch">W — winch</option>
+                    <option value="S" data-i18n="logbook.flights.aerotow">S — aerotow</option>
+                    <option value="E" data-i18n="logbook.flights.electric">E — electric/motor</option>
+                </select>
             </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>Typ statku</label><input type="text" id="mAircraftType" placeholder="SZD-50-3"></div>
-            <div class="form-group"><label>Rejestracja</label><input type="text" id="mAircraftReg" placeholder="SP-3788"></div>
+            <div class="form-group">
+                <label data-i18n="logbook.tbl.aircraft">Aircraft</label>
+                <input type="text" id="mAircraftType" placeholder="SZD-50-3">
+            </div>
+            <div class="form-group">
+                <label data-i18n="logbook.flights.registration">Registration</label>
+                <input type="text" id="mAircraftReg" placeholder="SP-3788">
+            </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>Lotnisko startu</label><input type="text" id="mTakeoffAirport" placeholder="EPBK"></div>
-            <div class="form-group"><label>Czas startu</label><input type="time" id="mTakeoffTime"></div>
+            <div class="form-group">
+                <label data-i18n="logbook.flights.takeoff_airport">Takeoff airport</label>
+                <input type="text" id="mTakeoffAirport" placeholder="EPBK">
+            </div>
+            <div class="form-group">
+                <label data-i18n="logbook.flights.takeoff_time">Takeoff time</label>
+                <input type="time" id="mTakeoffTime">
+            </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>Lotnisko lądowania</label><input type="text" id="mLandingAirport" placeholder="EPBK"></div>
-            <div class="form-group"><label>Czas lądowania</label><input type="time" id="mLandingTime"></div>
+            <div class="form-group">
+                <label data-i18n="logbook.flights.landing_airport">Landing airport</label>
+                <input type="text" id="mLandingAirport" placeholder="EPBK">
+            </div>
+            <div class="form-group">
+                <label data-i18n="logbook.flights.landing_time">Landing time</label>
+                <input type="time" id="mLandingTime">
+            </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>Czas lotu (min)</label><input type="number" id="mFlightTime" min="0"></div>
-            <div class="form-group"><label>Zadanie</label><input type="text" id="mTask" placeholder="SPL / I-1"></div>
+            <div class="form-group">
+                <label data-i18n="logbook.flights.flight_time_min">Flight time (min)</label>
+                <input type="number" id="mFlightTime" min="0">
+            </div>
+            <div class="form-group">
+                <label data-i18n="logbook.tbl.task">Task</label>
+                <input type="text" id="mTask" placeholder="SPL / I-1">
+            </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>Pilot</label><input type="text" id="mPilot"></div>
-            <div class="form-group"><label>Instruktor</label><input type="text" id="mInstructor"></div>
+            <div class="form-group">
+                <label data-i18n="logbook.flights.pilot">Pilot</label>
+                <input type="text" id="mPilot">
+            </div>
+            <div class="form-group">
+                <label data-i18n="logbook.flights.instructor">Instructor</label>
+                <input type="text" id="mInstructor">
+            </div>
         </div>
         <div style="display:flex;gap:10px;margin-top:8px">
-            <button class="btn btn-primary" onclick="saveManualFlight()">Zapisz</button>
-            <button class="btn btn-secondary" onclick="closeManualModal()">Anuluj</button>
+            <button class="btn btn-primary" onclick="saveManualFlight()" data-i18n="logbook.btn.save">Save</button>
+            <button class="btn btn-secondary" onclick="closeManualModal()" data-i18n="logbook.btn.cancel">Cancel</button>
         </div>
     </div>
 </div>
@@ -121,14 +166,16 @@ function buildParams(page) {
 async function loadFlights(page = 1) {
     currentPage = page;
     const tbody = document.getElementById('flightsBody');
-    tbody.innerHTML = '<tr><td colspan="10" class="loading"><i class="fa fa-spinner fa-spin"></i> Ładowanie…</td></tr>';
+    const loadingMsg = window.i18n ? window.i18n.t('logbook.flights.loading', 'Loading…') : 'Loading…';
+    tbody.innerHTML = `<tr><td colspan="10" class="loading"><i class="fa fa-spinner fa-spin"></i> ${loadingMsg}</td></tr>`;
 
     const resp = await fetch('/logbook/api/flights?' + buildParams(page));
     const data = await resp.json();
     totalPages = data.pages || 1;
 
     if (!data.flights || data.flights.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="empty">Brak lotów</td></tr>';
+        const noFlights = window.i18n ? window.i18n.t('logbook.empty.no_flights', 'No flights recorded') : 'No flights recorded';
+        tbody.innerHTML = `<tr><td colspan="10" class="empty">${noFlights}</td></tr>`;
     } else {
         tbody.innerHTML = data.flights.map(f => `
             <tr>
@@ -146,12 +193,13 @@ async function loadFlights(page = 1) {
         `).join('');
     }
 
-    document.getElementById('pageInfo').textContent = `Strona ${currentPage} z ${totalPages} (${data.total} lotów łącznie)`;
+    document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages} (${data.total})`;
     document.getElementById('prevBtn').disabled = currentPage <= 1;
     document.getElementById('nextBtn').disabled = currentPage >= totalPages;
 }
 
 function changePage(dir) { if (currentPage + dir >= 1 && currentPage + dir <= totalPages) loadFlights(currentPage + dir); }
+
 function clearFilters() {
     ['dateFrom','dateTo','aircraftType'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('launchType').value = '';
@@ -159,10 +207,16 @@ function clearFilters() {
 }
 
 async function deleteFlight(id) {
-    if (!confirm('Usunąć ten lot?')) return;
+    const msg = window.i18n ? window.i18n.t('logbook.flights.delete_confirm', 'Delete this flight?') : 'Delete this flight?';
+    if (!confirm(msg)) return;
     const resp = await fetch(`/logbook/api/flights/${id}`, { method: 'DELETE' });
-    if (resp.ok) { showToast('Lot usunięty'); loadFlights(currentPage); }
-    else { const d = await resp.json(); showToast(d.error || 'Błąd', 'error'); }
+    if (resp.ok) {
+        showToast(window.i18n ? window.i18n.t('logbook.flights.deleted', 'Flight deleted') : 'Flight deleted');
+        loadFlights(currentPage);
+    } else {
+        const d = await resp.json();
+        showToast(d.error || 'Error', 'error');
+    }
 }
 
 function openManualModal() { document.getElementById('manualModal').style.display = 'flex'; }
@@ -187,8 +241,13 @@ async function saveManualFlight() {
         method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
     });
     const d = await resp.json();
-    if (resp.ok) { showToast('Lot zapisany'); closeManualModal(); loadFlights(currentPage); }
-    else showToast(d.error || 'Błąd', 'error');
+    if (resp.ok) {
+        showToast(window.i18n ? window.i18n.t('logbook.flights.saved', 'Flight saved') : 'Flight saved');
+        closeManualModal();
+        loadFlights(currentPage);
+    } else {
+        showToast(d.error || 'Error', 'error');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => loadFlights(1));

@@ -1,30 +1,36 @@
 {% extends 'logbook/base.html' %}
-{% block title %}Ustawienia{% endblock %}
+{% block title %}<span data-i18n="logbook.nav.settings">Settings</span>{% endblock %}
+{% block page_title %}<span data-i18n="logbook.nav.settings">Settings</span>{% endblock %}
 
 {% block content %}
 <div class="card">
-    <div class="card-title">Profil pilota</div>
+    <div class="card-title" data-i18n="logbook.settings.pilot_profile">Pilot profile</div>
     <div class="form-row">
         <div class="form-group">
-            <label>Ważność orzeczenia lekarskiego</label>
+            <label data-i18n="logbook.settings.medical_expiry">Medical certificate expiry</label>
             <input type="date" id="medicalExpiry">
         </div>
         <div class="form-group">
-            <label>Data uzyskania licencji SPL</label>
+            <label data-i18n="logbook.settings.license_date_spl">SPL licence date</label>
             <input type="date" id="licenseDate">
         </div>
     </div>
-    <button class="btn btn-primary" onclick="saveProfile()"><i class="fa fa-floppy-disk"></i> Zapisz</button>
+    <button class="btn btn-primary" onclick="saveProfile()">
+        <i class="fa fa-floppy-disk"></i> <span data-i18n="logbook.btn.save">Save</span>
+    </button>
 </div>
 
 <div class="card">
-    <div class="card-title">Synchronizacja</div>
-    <p style="color:var(--muted);font-size:.875rem;margin-bottom:16px">
-        Aby zsynchronizować loty, skonfiguruj połączenie na stronie
-        <a href="/logbook/connectors">Źródła danych</a>.
+    <div class="card-title" data-i18n="logbook.settings.sync">Synchronisation</div>
+    <p style="color:var(--gl-muted);font-size:.875rem;margin-bottom:16px">
+        <span data-i18n="logbook.settings.sync_desc">To sync flights, configure a connection on the Sources page.</span>
+        <a href="/logbook/connectors" data-i18n="logbook.nav.connectors">Sources</a>.
     </p>
-    <div id="syncStatus" style="margin-bottom:16px;font-size:.875rem;color:var(--muted)">Ładowanie statusu…</div>
-    <button class="btn btn-primary" onclick="triggerAllSync()"><i class="fa fa-rotate"></i> Synchronizuj teraz</button>
+    <div id="syncStatus" style="margin-bottom:16px;font-size:.875rem;color:var(--gl-muted)"
+         data-i18n="logbook.settings.sync_loading">Loading status…</div>
+    <button class="btn btn-primary" onclick="triggerAllSync()">
+        <i class="fa fa-rotate"></i> <span data-i18n="logbook.settings.sync_now">Sync now</span>
+    </button>
 </div>
 {% endblock %}
 
@@ -34,29 +40,35 @@ async function loadSyncStatus() {
     const resp = await fetch('/logbook/api/sync/status');
     const d = await resp.json();
     const el = document.getElementById('syncStatus');
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k, fb) => fb || k;
     if (d.last_sync) {
         const s = d.last_sync;
-        el.innerHTML = `Ostatnia synchronizacja: <strong>${s.started_at ? s.started_at.slice(0,16).replace('T',' ') : '—'}</strong>
+        const lastLabel = t('logbook.settings.sync_last', 'Last sync:');
+        el.innerHTML = `${lastLabel} <strong>${s.started_at ? s.started_at.slice(0,16).replace('T',' ') : '—'}</strong>
             <span class="badge badge-${s.status === 'success' ? 'success' : 'danger'}">${s.status}</span>
             ${s.message ? '— ' + s.message : ''}`;
     } else {
-        el.textContent = 'Brak danych o synchronizacji.';
+        el.textContent = t('logbook.settings.sync_none', 'No synchronisation data.');
     }
 }
 
 async function triggerAllSync() {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k, fb) => fb || k;
     const resp = await fetch('/logbook/api/connectors');
     const connectors = await resp.json();
-    if (!connectors.length) { showToast('Brak skonfigurowanych źródeł danych', 'error'); return; }
+    if (!connectors.length) {
+        showToast(t('logbook.settings.no_sources', 'No data sources configured.'), 'error');
+        return;
+    }
     for (const c of connectors.filter(c => c.is_active)) {
         await fetch(`/logbook/api/connectors/${c.id}/sync`, { method: 'POST' });
     }
-    showToast('Synchronizacja uruchomiona');
+    showToast(t('logbook.settings.sync_started', 'Sync started'));
     setTimeout(loadSyncStatus, 2000);
 }
 
 async function saveProfile() {
-    showToast('Funkcja w przygotowaniu');
+    showToast(window.i18n ? window.i18n.t('logbook.settings.sync_started', 'Coming soon') : 'Coming soon');
 }
 
 document.addEventListener('DOMContentLoaded', loadSyncStatus);
