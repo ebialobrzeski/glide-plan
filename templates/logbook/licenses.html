@@ -34,7 +34,6 @@
 .badge-fill   { background:rgba(8,145,178,.15);   color:var(--gl-info);    }
 .badge-alert  { background:rgba(220,38,38,.15);   color:var(--gl-danger);  }
 .alert-desc    { font-size:0.8rem; color:var(--gl-muted); margin-top:6px; line-height:1.4; }
-.alert-code    { font-size:0.68rem; color:rgba(100,116,139,.6); margin-top:4px; }
 .progress-req  { margin-top:8px; font-size:0.72rem; color:var(--gl-muted); }
 
 .winch-card      { background:var(--gl-surface); border-radius:12px; padding:18px; border:1px solid var(--gl-border); }
@@ -153,9 +152,6 @@
     <div class="alert-desc"
          data-i18n="{{ a.desc_key }}"
          data-i18n-params="{{ a.desc_params | tojson | e }}">{{ a.description }}</div>
-    {% endif %}
-    {% if a.code %}
-    <div class="alert-code">{{ a.code }}</div>
     {% endif %}
     {% if a.level == 'success' %}
     <div class="progress-req">

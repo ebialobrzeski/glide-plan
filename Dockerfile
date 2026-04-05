@@ -20,6 +20,10 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p uploads data logs
 
+# Entrypoint runs migrations then starts gunicorn
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Set environment variables
 ENV FLASK_APP=app.py
 ENV PYTHONUNBUFFERED=1
@@ -28,5 +32,4 @@ ENV FLASK_ENV=production
 # Expose port
 EXPOSE 5000
 
-# Run the application with gunicorn for production
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--threads", "2", "--timeout", "120", "app:app"]
+CMD ["/entrypoint.sh"]
