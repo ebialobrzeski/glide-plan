@@ -63,11 +63,21 @@
     // ── DOM application ───────────────────────────────────────────────────────
 
     function _applyToDOM() {
-        // Text content
+        // Text content (with optional {param} substitution via data-i18n-params)
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
-            const val = _translations[key];
-            if (val !== undefined) el.textContent = val;
+            let val = _translations[key];
+            if (val === undefined) return;
+            const paramsAttr = el.getAttribute('data-i18n-params');
+            if (paramsAttr) {
+                try {
+                    const params = JSON.parse(paramsAttr);
+                    Object.entries(params).forEach(([k, v]) => {
+                        val = val.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+                    });
+                } catch (_) { /* malformed JSON — use raw translation */ }
+            }
+            el.textContent = val;
         });
         // Placeholder attributes
         document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
@@ -147,12 +157,19 @@
      * Translate a key, returning the translated string or a fallback.
      * @param {string} key
      * @param {string} [fallback] - default returned when key not found
+     * @param {Object} [params]   - {placeholder: value} pairs for {param} substitution
      * @returns {string}
      */
-    function t(key, fallback) {
-        return _translations[key] !== undefined
+    function t(key, fallback, params) {
+        let val = _translations[key] !== undefined
             ? _translations[key]
             : (fallback !== undefined ? fallback : key);
+        if (params) {
+            Object.entries(params).forEach(([k, v]) => {
+                val = val.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+            });
+        }
+        return val;
     }
 
     /**

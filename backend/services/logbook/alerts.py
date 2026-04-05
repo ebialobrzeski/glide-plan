@@ -33,12 +33,17 @@ LEVEL_DANGER  = 'danger'
 
 
 def _alert(level: str, code: str, title: str, description: str = '',
-           days: int = 0, action: str = '') -> dict:
+           days: int = 0, action: str = '',
+           title_key: str = '', desc_key: str = '',
+           desc_params: Optional[dict] = None) -> dict:
     return {
         'level':       level,
         'code':        code,
         'title':       title,
+        'title_key':   title_key or f'logbook.alert.{code}.title',
         'description': description,
+        'desc_key':    desc_key or (f'logbook.alert.{code}.desc' if description else ''),
+        'desc_params': desc_params or {},
         'days':        days,          # days since last event (positive) or until expiry (negative)
         'action':      action,        # i18n key for an action button label, or ''
     }
@@ -154,6 +159,7 @@ def _check_biennial_currency(db: Session, user: User, today: date) -> list[dict]
             LEVEL_OK, 'currency_ok',
             'Current biennial practice — SPL',
             f'{window["flight_time_str"]} and {launches} launches in the last 24 months — requirements met.',
+            desc_params={'time': window['flight_time_str'], 'launches': launches},
         ))
     else:
         missing = []
@@ -168,6 +174,7 @@ def _check_biennial_currency(db: Session, user: User, today: date) -> list[dict]
             'Biennial currency low — SPL',
             f'SFCL.160(a) requires 5h + 15 launches in any 24-month window. '
             f'Still needed: {", ".join(missing)}.',
+            desc_params={'missing': ', '.join(missing)},
         ))
 
     return alerts
@@ -195,6 +202,9 @@ def _check_launch_recency(db: Session, user: User, today: date) -> list[dict]:
                 f'SFCL.130: privileges are restricted to methods passed in the practical exam. '
                 f'Last {label} launch was {days} days ago — refresher training recommended.',
                 days=days,
+                title_key='logbook.alert.launch_180.title',
+                desc_key='logbook.alert.launch_180.desc',
+                desc_params={'method': label, 'days': days},
             ))
         elif days > 90:
             alerts.append(_alert(
@@ -202,6 +212,9 @@ def _check_launch_recency(db: Session, user: User, today: date) -> list[dict]:
                 f'No {label} launch in over 90 days',
                 f'Last {label} launch was {days} days ago. Consider a currency flight.',
                 days=days,
+                title_key='logbook.alert.launch_90.title',
+                desc_key='logbook.alert.launch_90.desc',
+                desc_params={'method': label, 'days': days},
             ))
 
     return alerts
@@ -220,6 +233,7 @@ def _check_passenger_recency(db: Session, user: User, today: date) -> list[dict]
             'as PIC in the last 90 days. '
             f'Current: {window_90["flights"]} flights in the last 90 days.',
             action='logbook.alert.action.check',
+            desc_params={'flights': window_90['flights']},
         ))
 
     return alerts
@@ -240,6 +254,7 @@ def _check_passenger_thresholds(db: Session, user: User, today: date, profile) -
             f'SFCL.115(b)(1): first passenger requires 10h PIC or 30 PIC launches. '
             f'Current: {total_launches} PIC launches.',
             action='logbook.alert.action.check',
+            desc_params={'launches': total_launches},
         ))
     elif total_launches < 200:
         alerts.append(_alert(
@@ -247,6 +262,7 @@ def _check_passenger_thresholds(db: Session, user: User, today: date, profile) -
             'Hire/reward flights — threshold 2',
             f'SFCL.115(b)(2): flights for hire/reward require 75h PIC or 200 PIC launches '
             f'+ proficiency check. Current: {total_launches} PIC launches.',
+            desc_params={'launches': total_launches},
         ))
 
     return alerts
@@ -275,6 +291,7 @@ def _check_medical(user: User, today: date, profile) -> list[dict]:
             f'Your medical certificate expired {abs(days_remaining)} days ago. '
             'You cannot exercise the privileges of your licence until you renew it.',
             days=abs(days_remaining),
+            desc_params={'days': abs(days_remaining)},
         ))
     elif days_remaining <= 60:
         alerts.append(_alert(
@@ -283,6 +300,7 @@ def _check_medical(user: User, today: date, profile) -> list[dict]:
             f'Your medical certificate expires in {days_remaining} days ({expiry.isoformat()}). '
             'Schedule a renewal appointment.',
             days=days_remaining,
+            desc_params={'days': days_remaining, 'expiry': expiry.isoformat()},
         ))
 
     return alerts

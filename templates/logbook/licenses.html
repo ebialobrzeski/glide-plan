@@ -138,7 +138,7 @@
             {% elif a.level == 'warning' %}<i class="fas fa-triangle-exclamation"></i>
             {% else %}<i class="fas fa-circle-info"></i>{% endif %}
         </span>
-        <span class="alert-card-title">{{ a.title }}</span>
+        <span class="alert-card-title" data-i18n="{{ a.title_key }}">{{ a.title }}</span>
         {% if a.level == 'success' %}
         <span class="alert-card-badge badge-ok" data-i18n="logbook.alert.badge.ok">OK</span>
         {% elif a.action == 'logbook.alert.action.check' %}
@@ -150,7 +150,9 @@
         {% endif %}
     </div>
     {% if a.description %}
-    <div class="alert-desc">{{ a.description }}</div>
+    <div class="alert-desc"
+         data-i18n="{{ a.desc_key }}"
+         data-i18n-params="{{ a.desc_params | tojson | e }}">{{ a.description }}</div>
     {% endif %}
     {% if a.code %}
     <div class="alert-code">{{ a.code }}</div>

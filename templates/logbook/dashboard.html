@@ -185,13 +185,15 @@
         {% elif a.level == 'danger' %}<i class="fas fa-circle-exclamation" style="color:var(--gl-danger)"></i>
         {% elif a.level == 'warning' %}<i class="fas fa-triangle-exclamation" style="color:var(--gl-warning)"></i>
         {% else %}<i class="fas fa-circle-info" style="color:var(--gl-info)"></i>{% endif %}
-        {{ a.title }}
+        <span data-i18n="{{ a.title_key }}">{{ a.title }}</span>
         {% if a.level == 'success' %}<span class="alert-badge b-ok" data-i18n="logbook.alert.badge.ok">OK</span>
         {% elif a.action == 'logbook.alert.action.check' %}<span class="alert-badge b-check" data-i18n="logbook.alert.badge.check">Check</span>
         {% elif a.action == 'logbook.alert.action.fill_in' %}<span class="alert-badge b-info" data-i18n="logbook.alert.badge.fill_in">Fill in</span>
         {% elif a.level == 'danger' %}<span class="alert-badge b-alert" data-i18n="logbook.alert.badge.alert">Alert</span>{% endif %}
     </div>
-    {% if a.description %}<div class="alert-desc">{{ a.description }}</div>{% endif %}
+    {% if a.description %}<div class="alert-desc"
+         data-i18n="{{ a.desc_key }}"
+         data-i18n-params="{{ a.desc_params | tojson | e }}">{{ a.description }}</div>{% endif %}
 </div>
 {% endfor %}
 {% endif %}
