@@ -324,6 +324,41 @@ def by_month_and_launch(db: Session, user: User,
     return sorted(agg.values(), key=lambda x: (x['year'], x['month']))
 
 
+def by_month_and_aircraft(db: Session, user: User,
+                          date_from: Optional[date] = None,
+                          date_to: Optional[date] = None) -> list[dict]:
+    """Monthly totals broken down by aircraft type — used for stacked bar charts."""
+    q = db.query(
+        extract('year',  Flight.date).label('year'),
+        extract('month', Flight.date).label('month'),
+        Flight.aircraft_type,
+        func.count(Flight.id).label('flights'),
+        func.coalesce(func.sum(Flight.flight_time_min), 0).label('minutes'),
+    ).filter(
+        Flight.user_id == user.id,
+        Flight.date.isnot(None),
+    )
+
+    if date_from:
+        q = q.filter(Flight.date >= date_from)
+    if date_to:
+        q = q.filter(Flight.date <= date_to)
+
+    rows = q.group_by('year', 'month', Flight.aircraft_type).order_by('year', 'month').all()
+
+    return [
+        {
+            'year':          int(r.year),
+            'month':         int(r.month),
+            'label':         _MONTH_SHORT[int(r.month)],
+            'aircraft_type': r.aircraft_type or '?',
+            'flights':       r.flights,
+            'minutes':       int(r.minutes),
+        }
+        for r in rows
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Aircraft breakdown
 # ---------------------------------------------------------------------------
@@ -504,10 +539,13 @@ def longest_flights(db: Session, user: User, limit: int = 5,
 
 def last_flight_by_launch(db: Session, user: User,
                           launch_type: Optional[str] = None) -> Optional[date]:
-    """Return the date of the most recent flight, optionally filtered by launch type."""
+    """Return the date of the most recent flight, optionally filtered by launch type.
+
+    Uses a LIKE prefix match so that aerotow variants like 'S 800' are matched by 'S'.
+    """
     q = db.query(func.max(Flight.date)).filter(Flight.user_id == user.id)
     if launch_type:
-        q = q.filter(Flight.launch_type == launch_type)
+        q = q.filter(Flight.launch_type.like(f'{launch_type}%'))
     return q.scalar()
 
 
@@ -527,7 +565,7 @@ def flights_in_window(db: Session, user: User,
         Flight.date >= cutoff,
     )
     if launch_type:
-        q = q.filter(Flight.launch_type == launch_type)
+        q = q.filter(Flight.launch_type.like(f'{launch_type}%'))
 
     row = q.one()
     h, m = divmod(int(row.minutes), 60)

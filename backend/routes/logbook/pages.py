@@ -141,8 +141,10 @@ def statistics_page():
     else:
         period_summary = all_time
 
-    monthly_launch = stats_svc.by_month_and_launch(db, current_user,
-                                                   date_from=date_from, date_to=date_to)
+    monthly_launch   = stats_svc.by_month_and_launch(db, current_user,
+                                                     date_from=date_from, date_to=date_to)
+    monthly_aircraft = stats_svc.by_month_and_aircraft(db, current_user,
+                                                       date_from=date_from, date_to=date_to)
     monthly_data   = stats_svc.by_month(db, current_user,
                                         date_from=date_from, date_to=date_to)
     by_aircraft    = stats_svc.by_aircraft(db, current_user,
@@ -166,6 +168,7 @@ def statistics_page():
         period=period_summary,
         summary=all_time,
         monthly_launch_data=monthly_launch,
+        monthly_aircraft_data=monthly_aircraft,
         monthly_data=monthly_data,
         aircraft_data=by_aircraft,
         launch_data=by_launch,
