@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,186 +7,588 @@
     <link rel="icon" href="/static/images/favicon.ico" sizes="any">
     <link rel="icon" href="/static/images/icon-192.png" type="image/png" sizes="192x192">
     <link rel="apple-touch-icon" href="/static/images/apple-touch-icon.png">
+
+    <!-- Shoelace Web Components — same CDN as main app -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/themes/light.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/themes/dark.css" />
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/shoelace-autoloader.js"></script>
+
+    <!-- Icons + Chart.js -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- i18n -->
+    <script src="/static/js/i18n.js"></script>
+
     <style>
+        /* ── Reset ────────────────────────────────────────────────────────── */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+        /* ── Design tokens — light theme ────────────────────────────────── */
         :root {
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
-            --bg: #f0f4f8;
-            --card: #ffffff;
-            --text: #1e293b;
-            --muted: #64748b;
-            --border: #e2e8f0;
-            --danger: #dc2626;
-            --warning: #d97706;
-            --success: #16a34a;
-            --info: #0891b2;
-            --nav-bg: #1e293b;
-            --nav-text: #cbd5e1;
-            --nav-active: #2563eb;
+            --gl-sidebar-w: 220px;
+            --gl-topbar-h: 52px;
+
+            /* Matches main GlidePlan app --background / --surface / --border */
+            --gl-bg:       #f8fafc;
+            --gl-surface:  #ffffff;
+            --gl-border:   #e2e8f0;
+            --gl-text:     #1e293b;
+            --gl-muted:    #64748b;
+
+            --gl-primary:  #2563eb;
+            --gl-primary-h:#1d4ed8;
+            --gl-danger:   #dc2626;
+            --gl-warning:  #d97706;
+            --gl-success:  #059669;
+            --gl-info:     #0891b2;
+
+            --gl-sidebar-bg:    #0f172a;
+            --gl-sidebar-text:  #94a3b8;
+            --gl-sidebar-hover: rgba(255,255,255,.07);
+            --gl-sidebar-active:#2563eb;
+
+            --gl-topbar-bg:     #1e293b;
+            --gl-topbar-text:   #cbd5e1;
+
+            /* Matches main app --shadow: very crisp, minimal */
+            --gl-shadow: 0 1px 3px 0 rgba(0,0,0,.1);
+            --gl-shadow-md: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -1px rgba(0,0,0,.04);
         }
 
+        /* ── Dark theme overrides ─────────────────────────────────────────── */
+        html.sl-theme-dark {
+            --gl-bg:      #0f172a;
+            --gl-surface: #1e293b;
+            --gl-border:  #334155;
+            --gl-text:    #e2e8f0;
+            --gl-muted:   #94a3b8;
+            --gl-shadow:  0 1px 3px 0 rgba(0,0,0,.35);
+            --gl-shadow-md: 0 4px 6px rgba(0,0,0,.4);
+        }
+
+        /* ── App shell ───────────────────────────────────────────────────── */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text);
+            background: var(--gl-bg);
+            color: var(--gl-text);
             min-height: 100vh;
+            display: flex;
+        }
+
+        /* ── Sidebar ──────────────────────────────────────────────────────── */
+        .gl-sidebar {
+            width: var(--gl-sidebar-w);
+            background: var(--gl-sidebar-bg);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 50;
+            overflow-y: auto;
+        }
+
+        .gl-sidebar-brand {
+            padding: 18px 20px 14px;
+            border-bottom: 1px solid rgba(255,255,255,.06);
+        }
+        .gl-sidebar-brand a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+        .gl-sidebar-logo {
+            width: 32px;
+            height: 32px;
+            border-radius: 7px;
+            object-fit: contain;
+        }
+        .gl-sidebar-brand-text {
             display: flex;
             flex-direction: column;
         }
+        .gl-sidebar-appname {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #fff;
+            line-height: 1.2;
+        }
+        .gl-sidebar-appname span { color: var(--gl-primary); }
+        .gl-sidebar-subtitle {
+            font-size: 0.68rem;
+            color: var(--gl-sidebar-text);
+            margin-top: 1px;
+        }
 
-        /* ── Nav ── */
-        nav {
-            background: var(--nav-bg);
-            padding: 0 20px;
+        /* Nav sections */
+        .gl-nav {
+            flex: 1;
+            padding: 12px 10px;
+        }
+        .gl-nav-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: rgba(148,163,184,.5);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            padding: 10px 10px 4px;
+        }
+        .gl-nav a {
             display: flex;
             align-items: center;
-            gap: 4px;
-            height: 52px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        .nav-brand { color: #fff; font-weight: 700; font-size: 1.05rem; margin-right: 16px; text-decoration: none; }
-        .nav-brand span { color: var(--primary); }
-        nav a {
-            color: var(--nav-text);
+            gap: 10px;
+            padding: 9px 12px;
+            border-radius: 8px;
+            color: var(--gl-sidebar-text);
             text-decoration: none;
-            padding: 6px 12px;
-            border-radius: 6px;
             font-size: 0.875rem;
             transition: background .15s, color .15s;
+            margin-bottom: 2px;
         }
-        nav a:hover, nav a.active { background: rgba(255,255,255,.1); color: #fff; }
-        .nav-spacer { flex: 1; }
-        .nav-user { color: var(--nav-text); font-size: 0.8rem; }
+        .gl-nav a .fa, .gl-nav a .fas, .gl-nav a .fa-solid {
+            width: 16px;
+            text-align: center;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+        .gl-nav a:hover { background: var(--gl-sidebar-hover); color: #e2e8f0; }
+        .gl-nav a.active {
+            background: rgba(37,99,235,.18);
+            color: #fff;
+            font-weight: 600;
+            border-left: 3px solid var(--gl-primary);
+            padding-left: 9px;
+        }
+        .gl-nav a.active .fa, .gl-nav a.active .fas { color: #60a5fa; }
 
-        /* ── Layout ── */
-        main { flex: 1; padding: 24px 20px 48px; max-width: 1200px; width: 100%; margin: 0 auto; }
+        .gl-nav-badge {
+            margin-left: auto;
+            background: var(--gl-primary);
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 999px;
+        }
 
-        /* ── Cards ── */
+        /* Sidebar footer */
+        .gl-sidebar-footer {
+            padding: 12px 10px;
+            border-top: 1px solid rgba(255,255,255,.06);
+        }
+        .gl-sidebar-footer a {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: var(--gl-sidebar-text);
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: background .15s, color .15s;
+        }
+        .gl-sidebar-footer a:hover { background: var(--gl-sidebar-hover); color: #e2e8f0; }
+        .gl-sync-info {
+            font-size: 0.68rem;
+            color: rgba(148,163,184,.5);
+            padding: 6px 12px 8px;
+        }
+
+        /* ── Main area ────────────────────────────────────────────────────── */
+        .gl-main {
+            margin-left: var(--gl-sidebar-w);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* ── Top bar ──────────────────────────────────────────────────────── */
+        .gl-topbar {
+            height: var(--gl-topbar-h);
+            background: var(--gl-topbar-bg);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 10px;
+            position: sticky;
+            top: 0;
+            z-index: 40;
+        }
+        .gl-topbar-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+        .gl-topbar-spacer { flex: 1; }
+        .gl-topbar-user {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            color: var(--gl-topbar-text);
+        }
+        .gl-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--gl-primary);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.72rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        /* Shoelace overrides for dark topbar context */
+        .gl-topbar sl-select {
+            --sl-input-background-color: rgba(255,255,255,.05);
+            --sl-input-border-color: rgba(255,255,255,.12);
+            --sl-input-color: #cbd5e1;
+            --sl-input-font-size-small: 0.8rem;
+        }
+        .gl-topbar sl-icon-button::part(base) { color: var(--gl-topbar-text); }
+        .gl-topbar sl-icon-button::part(base):hover { color: #fff; background: rgba(255,255,255,.08); border-radius: 6px; }
+        .gl-topbar sl-divider { height: 20px; --color: rgba(255,255,255,.15); }
+
+        /* ── Content ──────────────────────────────────────────────────────── */
+        .gl-content {
+            flex: 1;
+            padding: 20px 22px 36px;
+            max-width: 1300px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* ── Cards ────────────────────────────────────────────────────────── */
         .card {
-            background: var(--card);
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 12px rgba(0,0,0,.06);
-            margin-bottom: 16px;
+            background: var(--gl-surface);
+            border-radius: 8px;
+            padding: 16px 20px;
+            box-shadow: var(--gl-shadow);
+            margin-bottom: 14px;
+            border: 1px solid var(--gl-border);
         }
-        .card-title { font-size: 0.95rem; font-weight: 600; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: .04em; }
+        .card-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--gl-muted);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 12px;
+        }
 
-        /* ── KPI grid ── */
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
-        .kpi { background: var(--card); border-radius: 12px; padding: 18px 20px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
-        .kpi-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-        .kpi-value { font-size: 1.8rem; font-weight: 700; color: var(--text); margin-top: 4px; }
-        .kpi-sub { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+        /* ── KPI grid ─────────────────────────────────────────────────────── */
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+        .kpi {
+            background: var(--gl-surface);
+            border-radius: 8px;
+            padding: 16px 18px;
+            box-shadow: var(--gl-shadow);
+            border: 1px solid var(--gl-border);
+        }
+        .kpi-label { font-size: 0.7rem; color: var(--gl-muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+        .kpi-value { font-size: 1.65rem; font-weight: 700; color: var(--gl-text); margin-top: 4px; line-height: 1.1; }
+        .kpi-sub   { font-size: 0.73rem; color: var(--gl-muted); margin-top: 3px; }
 
-        /* ── Charts ── */
+        /* ── Charts ───────────────────────────────────────────────────────── */
         .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
-        @media (max-width: 700px) { .charts-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
         canvas { max-height: 260px; }
 
-        /* ── Table ── */
+        /* ── Table ────────────────────────────────────────────────────────── */
         .table-wrap { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-        th { text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 8px 12px; border-bottom: 2px solid var(--border); }
-        td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+        th {
+            text-align: left;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            color: var(--gl-muted);
+            padding: 10px 12px;
+            border-bottom: 2px solid var(--gl-border);
+            white-space: nowrap;
+            background: var(--gl-bg);
+            position: sticky;
+            top: 0;
+        }
+        td { padding: 10px 12px; border-bottom: 1px solid var(--gl-border); color: var(--gl-text); vertical-align: middle; }
         tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #f8fafc; }
+        tbody tr:hover td { background: rgba(37,99,235,.03); }
 
-        /* ── Badges / alerts ── */
+        /* ── Badges ───────────────────────────────────────────────────────── */
         .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
-        .badge-danger  { background: #fee2e2; color: var(--danger); }
-        .badge-warning { background: #fef3c7; color: var(--warning); }
-        .badge-info    { background: #e0f2fe; color: var(--info); }
-        .badge-success { background: #dcfce7; color: var(--success); }
+        .badge-danger   { background: rgba(220,38,38,.15);   color: var(--gl-danger); }
+        .badge-warning  { background: rgba(217,119,6,.15);   color: var(--gl-warning); }
+        .badge-info     { background: rgba(8,145,178,.15);   color: var(--gl-info); }
+        .badge-success  { background: rgba(22,163,74,.15);   color: var(--gl-success); }
+        .badge-neutral  { background: rgba(100,116,139,.15); color: var(--gl-muted); }
 
-        .alert-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; }
-        .alert-item.danger  { background: #fee2e2; }
-        .alert-item.warning { background: #fef3c7; }
-        .alert-item.info    { background: #e0f2fe; }
+        /* ── Alert items ──────────────────────────────────────────────────── */
+        .alert-item { display: flex; align-items: flex-start; gap: 12px; padding: 10px 14px; border-radius: 7px; margin-bottom: 8px; border: 1px solid transparent; }
+        .alert-item.danger  { background: rgba(220,38,38,.06);  border-color: rgba(220,38,38,.18); }
+        .alert-item.warning { background: rgba(217,119,6,.06);  border-color: rgba(217,119,6,.18); }
+        .alert-item.info    { background: rgba(8,145,178,.06);  border-color: rgba(8,145,178,.18); }
+        .alert-item.success { background: rgba(5,150,105,.06);  border-color: rgba(5,150,105,.18); }
+        .alert-icon { font-size: 1rem; margin-top: 1px; flex-shrink: 0; }
+        .alert-body { flex: 1; }
+        .alert-title { font-weight: 600; font-size: 0.875rem; }
+        .alert-desc  { font-size: 0.78rem; color: var(--gl-muted); margin-top: 2px; line-height: 1.4; }
+        .alert-action { margin-left: auto; flex-shrink: 0; }
 
-        /* ── Buttons ── */
-        .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 0.875rem; font-weight: 500; border: none; cursor: pointer; transition: background .15s; text-decoration: none; }
-        .btn-primary   { background: var(--primary); color: #fff; }
-        .btn-primary:hover { background: var(--primary-hover); }
-        .btn-secondary { background: var(--border); color: var(--text); }
-        .btn-secondary:hover { background: #d1d5db; }
-        .btn-danger    { background: var(--danger); color: #fff; }
-        .btn-danger:hover { background: #b91c1c; }
-        .btn-sm { padding: 5px 10px; font-size: 0.78rem; }
+        /* ── Buttons ──────────────────────────────────────────────────────── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: background .15s, opacity .15s, box-shadow .15s;
+            text-decoration: none;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+        .btn-primary   { background: var(--gl-primary); color: #fff; border-color: var(--gl-primary); }
+        .btn-primary:hover  { background: var(--gl-primary-h); border-color: var(--gl-primary-h); }
+        .btn-secondary { background: var(--gl-surface); color: var(--gl-text); border-color: var(--gl-border); }
+        .btn-secondary:hover { background: var(--gl-bg); }
+        .btn-danger    { background: var(--gl-danger); color: #fff; border-color: var(--gl-danger); }
+        .btn-danger:hover  { opacity: .85; }
+        .btn-sm { padding: 4px 10px; font-size: 0.78rem; border-radius: 5px; }
+        .btn-ghost { background: transparent; color: var(--gl-primary); border-color: transparent; }
+        .btn-ghost:hover { background: rgba(37,99,235,.07); }
 
-        /* ── Forms ── */
-        .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-        .form-group { display: flex; flex-direction: column; gap: 4px; min-width: 140px; flex: 1; }
-        label { font-size: 0.8rem; font-weight: 500; color: var(--muted); }
-        input, select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.875rem; background: #fff; color: var(--text); }
-        input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+        /* ── Forms ────────────────────────────────────────────────────────── */
+        .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; min-width: 120px; flex: 1; }
+        label { font-size: 0.78rem; font-weight: 600; color: var(--gl-muted); }
+        input, select, textarea {
+            padding: 7px 10px;
+            border: 1px solid var(--gl-border);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            background: var(--gl-surface);
+            color: var(--gl-text);
+            transition: border-color .15s, box-shadow .15s;
+            font-family: inherit;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--gl-primary);
+            box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+        }
+        input::placeholder { color: var(--gl-muted); opacity: .7; }
 
-        /* ── Pagination ── */
+        /* ── Tabs ─────────────────────────────────────────────────────────── */
+        .tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--gl-border); margin-bottom: 20px; }
+        .tab { padding: 8px 16px; font-size: 0.875rem; font-weight: 500; color: var(--gl-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color .15s, border-color .15s; }
+        .tab.active { color: var(--gl-primary); border-bottom-color: var(--gl-primary); }
+        .tab:hover:not(.active) { color: var(--gl-text); }
+
+        /* ── Pagination ───────────────────────────────────────────────────── */
         .pagination { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 0.875rem; }
-        .pagination .page-info { color: var(--muted); flex: 1; }
+        .pagination .page-info { color: var(--gl-muted); flex: 1; }
 
-        /* ── Tab bar ── */
-        .tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
-        .tab { padding: 8px 16px; font-size: 0.875rem; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
-        .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        /* ── Misc ─────────────────────────────────────────────────────────── */
+        .loading { text-align: center; color: var(--gl-muted); padding: 40px; }
+        .empty   { text-align: center; color: var(--gl-muted); padding: 28px; font-size: 0.875rem; }
+        .section-title {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--gl-muted);
+            margin: 18px 0 8px;
+        }
 
-        /* ── Loading / empty ── */
-        .loading { text-align: center; color: var(--muted); padding: 40px; }
-        .empty    { text-align: center; color: var(--muted); padding: 32px; font-size: 0.9rem; }
-
-        /* ── Toast ── */
-        #toast { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
-        .toast-msg { padding: 12px 18px; border-radius: 10px; font-size: 0.875rem; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,.2); animation: slideUp .2s ease; }
-        .toast-msg.success { background: var(--success); }
-        .toast-msg.error   { background: var(--danger); }
+        /* ── Toast ────────────────────────────────────────────────────────── */
+        #toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+        .toast-msg { padding: 12px 18px; border-radius: 10px; font-size: 0.875rem; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,.25); animation: slideUp .2s ease; max-width: 320px; }
+        .toast-msg.success { background: var(--gl-success); }
+        .toast-msg.error   { background: var(--gl-danger); }
+        .toast-msg.info    { background: var(--gl-info); }
         @keyframes slideUp { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* ── Progress bar ─────────────────────────────────────────────────── */
+        .progress-track { background: var(--gl-border); border-radius: 999px; height: 5px; margin-top: 6px; overflow: hidden; }
+        .progress-bar   { height: 100%; border-radius: 999px; transition: width .4s ease; }
+        .progress-bar.success { background: var(--gl-success); }
+        .progress-bar.warning { background: var(--gl-warning); }
+        .progress-bar.danger  { background: var(--gl-danger);  }
+        .progress-bar.info    { background: var(--gl-info);    }
+        .progress-bar.primary { background: var(--gl-primary); }
+
+        /* ── Responsive ───────────────────────────────────────────────────── */
+        @media (max-width: 640px) {
+            .gl-sidebar { display: none; }
+            .gl-main   { margin-left: 0; }
+            .gl-content { padding: 16px; }
+        }
     </style>
     {% block head %}{% endblock %}
 </head>
 <body>
-<nav>
-    <a class="nav-brand" href="/logbook/dashboard">Glide<span>Log</span></a>
-    <a href="/logbook/dashboard" {% if request.path == '/logbook/dashboard' %}class="active"{% endif %}>
-        <i class="fa fa-gauge-high"></i> Dashboard
-    </a>
-    <a href="/logbook/flights" {% if request.path == '/logbook/flights' %}class="active"{% endif %}>
-        <i class="fa fa-plane"></i> Loty
-    </a>
-    <a href="/logbook/import" {% if request.path == '/logbook/import' %}class="active"{% endif %}>
-        <i class="fa fa-file-import"></i> Import
-    </a>
-    <a href="/logbook/connectors" {% if request.path == '/logbook/connectors' %}class="active"{% endif %}>
-        <i class="fa fa-plug"></i> Źródła
-    </a>
-    {% if current_user.tier == 'admin' %}
-    <a href="/logbook/admin" {% if request.path == '/logbook/admin' %}class="active"{% endif %}>
-        <i class="fa fa-shield-halved"></i> Admin
-    </a>
-    {% endif %}
-    <div class="nav-spacer"></div>
-    <span class="nav-user"><i class="fa fa-user"></i> {{ current_user.display_name }}</span>
-    <a href="/auth/logout" style="margin-left:8px"><i class="fa fa-right-from-bracket"></i></a>
-</nav>
 
-<main>
-    {% block content %}{% endblock %}
-</main>
+<!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
+<aside class="gl-sidebar">
+    <div class="gl-sidebar-brand">
+        <a href="/logbook/dashboard">
+            <img src="/static/images/logo.png" alt="GlidePlan" class="gl-sidebar-logo">
+            <div class="gl-sidebar-brand-text">
+                <span class="gl-sidebar-appname">Glide<span>Log</span></span>
+                <span class="gl-sidebar-subtitle" data-i18n="logbook.brand.subtitle">Flight Logbook</span>
+            </div>
+        </a>
+    </div>
 
+    <nav class="gl-nav">
+        <a href="/logbook/dashboard"
+           {% if request.path == '/logbook/dashboard' %}class="active"{% endif %}>
+            <i class="fas fa-gauge-high"></i>
+            <span data-i18n="logbook.nav.dashboard">Dashboard</span>
+        </a>
+        <a href="/logbook/licenses"
+           {% if request.path == '/logbook/licenses' %}class="active"{% endif %}>
+            <i class="fas fa-id-card"></i>
+            <span data-i18n="logbook.nav.licenses">Licenses</span>
+        </a>
+        <a href="/logbook/flights"
+           {% if request.path == '/logbook/flights' %}class="active"{% endif %}>
+            <i class="fas fa-plane"></i>
+            <span data-i18n="logbook.nav.flights">Flights</span>
+        </a>
+        <a href="/logbook/statistics"
+           {% if request.path == '/logbook/statistics' %}class="active"{% endif %}>
+            <i class="fas fa-chart-bar"></i>
+            <span data-i18n="logbook.nav.statistics">Statistics</span>
+        </a>
+        <a href="/logbook/import"
+           {% if request.path == '/logbook/import' %}class="active"{% endif %}>
+            <i class="fas fa-file-import"></i>
+            <span data-i18n="logbook.nav.import">Import / Add Flight</span>
+        </a>
+        <a href="/logbook/connectors"
+           {% if request.path == '/logbook/connectors' %}class="active"{% endif %}>
+            <i class="fas fa-plug"></i>
+            <span data-i18n="logbook.nav.connectors">Sources</span>
+        </a>
+        <a href="/logbook/settings"
+           {% if request.path == '/logbook/settings' %}class="active"{% endif %}>
+            <i class="fas fa-gear"></i>
+            <span data-i18n="logbook.nav.settings">Settings</span>
+        </a>
+        {% if current_user.tier == 'admin' %}
+        <a href="/logbook/admin"
+           {% if request.path == '/logbook/admin' %}class="active"{% endif %}>
+            <i class="fas fa-shield-halved"></i>
+            <span data-i18n="logbook.nav.admin">Admin</span>
+        </a>
+        {% endif %}
+    </nav>
+
+    <div class="gl-sidebar-footer">
+        <a href="/">
+            <i class="fas fa-arrow-left"></i>
+            <span data-i18n="logbook.nav.back_to_glideplan">Back to GlidePlan</span>
+        </a>
+        <a href="/auth/logout">
+            <i class="fas fa-right-from-bracket"></i>
+            <span data-i18n="logbook.nav.logout">Log out</span>
+        </a>
+    </div>
+</aside>
+
+<!-- ── Main area ──────────────────────────────────────────────────────────── -->
+<div class="gl-main">
+
+    <!-- Top bar -->
+    <header class="gl-topbar">
+        <span class="gl-topbar-title">{% block page_title %}GlideLog{% endblock %}</span>
+        <div class="gl-topbar-spacer"></div>
+
+        <!-- Language selector — pre-populated; i18n.js overwrites on load -->
+        <sl-select id="lang-selector" size="small" style="width:140px;" title="Language">
+            <sl-option value="en">🇬🇧 English</sl-option>
+            <sl-option value="pl">🇵🇱 Polski</sl-option>
+            <sl-option value="de">🇩🇪 Deutsch</sl-option>
+            <sl-option value="cs">🇨🇿 Čeština</sl-option>
+        </sl-select>
+        <sl-divider vertical></sl-divider>
+
+        <!-- Theme toggle -->
+        <sl-icon-button name="moon" id="theme-toggle" label="Toggle theme"></sl-icon-button>
+        <sl-divider vertical></sl-divider>
+
+        <!-- User -->
+        <div class="gl-topbar-user">
+            <div class="gl-avatar" id="user-avatar">{{ current_user.display_name[:2].upper() }}</div>
+            <span>{{ current_user.display_name }}</span>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <main class="gl-content">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+
+<!-- Toast container -->
 <div id="toast"></div>
+
 <script>
-function showToast(msg, type='success') {
+// ── Theme toggle ────────────────────────────────────────────────────────────
+(function () {
+    const saved = localStorage.getItem('glideplan-theme');
+    const preferDark = saved !== 'light';
+    if (preferDark) document.documentElement.classList.add('sl-theme-dark');
+
+    customElements.whenDefined('sl-icon-button').then(() => {
+        const toggle = document.getElementById('theme-toggle');
+        if (!toggle) return;
+        toggle.name = preferDark ? 'sun' : 'moon';
+        toggle.addEventListener('click', () => {
+            const isDark = document.documentElement.classList.toggle('sl-theme-dark');
+            toggle.name = isDark ? 'sun' : 'moon';
+            localStorage.setItem('glideplan-theme', isDark ? 'dark' : 'light');
+        });
+    });
+})();
+
+// ── Toast helper ────────────────────────────────────────────────────────────
+function showToast(msg, type = 'success') {
     const t = document.createElement('div');
     t.className = 'toast-msg ' + type;
     t.textContent = msg;
     document.getElementById('toast').appendChild(t);
     setTimeout(() => t.remove(), 3500);
 }
+
+// ── i18n bootstrap + lang selector fallback ─────────────────────────────────
+// i18n.js auto-populates #lang-selector and applies data-i18n attributes.
+// The selector already has static <sl-option> nodes in the HTML above, so it
+// works even if the /api/i18n/languages request fails.
+// After Shoelace upgrades the element, set its value from localStorage.
+customElements.whenDefined('sl-select').then(() => {
+    const sel = document.getElementById('lang-selector');
+    if (!sel) return;
+    const stored = localStorage.getItem('glideplan_lang') || 'pl';
+    sel.value = stored;
+    sel.addEventListener('sl-change', () => {
+        if (window.i18n) window.i18n.setLanguage(sel.value);
+    });
+});
 </script>
+
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,0 +1,199 @@
+{% extends 'logbook/base.html' %}
+{% block title %}<span data-i18n="logbook.nav.licenses">Licenses</span>{% endblock %}
+{% block page_title %}<span data-i18n="logbook.licenses.page_title">Licenses &amp; Currency</span>{% endblock %}
+
+{% block head %}
+<style>
+.currency-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-bottom:20px; }
+.currency-card { background:var(--gl-surface); border-radius:12px; padding:18px 20px; border:1px solid var(--gl-border); }
+.cc-label      { font-size:0.72rem; color:var(--gl-muted); text-transform:uppercase; letter-spacing:.05em; }
+.cc-value      { font-size:1.5rem; font-weight:700; color:var(--gl-text); margin:4px 0 2px; line-height:1.1; }
+.cc-sub        { font-size:0.75rem; }
+.cc-ok         { color:var(--gl-success); }
+.cc-warn       { color:var(--gl-warning); }
+.cc-danger     { color:var(--gl-danger); }
+
+.method-grid   { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+.method-card   { background:var(--gl-surface); border-radius:12px; padding:18px; border:1px solid var(--gl-border); text-align:center; }
+.method-badge  { font-size:2rem; font-weight:800; margin-bottom:4px; }
+.method-name   { font-size:0.78rem; font-weight:600; color:var(--gl-text); }
+.method-days   { font-size:0.75rem; margin-top:6px; }
+.method-alert  { font-size:0.68rem; color:var(--gl-muted); margin-top:2px; }
+
+.alert-card    { border-radius:12px; padding:16px 18px; margin-bottom:10px; border:1px solid transparent; }
+.alert-card.success { background:rgba(22,163,74,.07); border-color:rgba(22,163,74,.2); }
+.alert-card.warning { background:rgba(217,119,6,.07); border-color:rgba(217,119,6,.2); }
+.alert-card.danger  { background:rgba(220,38,38,.07); border-color:rgba(220,38,38,.2); }
+.alert-card.info    { background:rgba(8,145,178,.07); border-color:rgba(8,145,178,.2); }
+.alert-card-header  { display:flex; align-items:center; gap:10px; }
+.alert-card-icon    { font-size:1rem; flex-shrink:0; }
+.alert-card-title   { font-weight:600; font-size:0.9rem; flex:1; }
+.alert-card-badge   { font-size:0.72rem; font-weight:700; padding:2px 10px; border-radius:999px; }
+.badge-ok     { background:rgba(22,163,74,.15);   color:var(--gl-success); }
+.badge-check  { background:rgba(217,119,6,.15);   color:var(--gl-warning); }
+.badge-fill   { background:rgba(8,145,178,.15);   color:var(--gl-info);    }
+.badge-alert  { background:rgba(220,38,38,.15);   color:var(--gl-danger);  }
+.alert-desc    { font-size:0.8rem; color:var(--gl-muted); margin-top:6px; line-height:1.4; }
+.alert-code    { font-size:0.68rem; color:rgba(100,116,139,.6); margin-top:4px; }
+.progress-req  { margin-top:8px; font-size:0.72rem; color:var(--gl-muted); }
+
+.winch-card      { background:var(--gl-surface); border-radius:12px; padding:18px; border:1px solid var(--gl-border); }
+.winch-operator  { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--gl-border); }
+.winch-operator:last-child { border-bottom:none; }
+.winch-avatar    { width:36px; height:36px; border-radius:50%; background:var(--gl-success); color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.78rem; font-weight:700; flex-shrink:0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Currency overview cards -->
+<div class="currency-grid">
+    <div class="currency-card">
+        <div class="cc-label" data-i18n="logbook.licenses.flight_time_24m">Flight time (24 months)</div>
+        <div class="cc-value {{ 'cc-ok' if currency.ok_hours else 'cc-warn' }}">
+            {{ currency.window_flight_str }}
+        </div>
+        <div class="cc-sub {{ 'cc-ok' if currency.ok_hours else 'cc-warn' }}">
+            {% if currency.ok_hours %}
+            <i class="fas fa-check"></i> <span data-i18n="logbook.licenses.req_met">requirement met</span>
+            {% else %}
+            <span data-i18n="logbook.licenses.req_5h">required 5h</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="currency-card">
+        <div class="cc-label" data-i18n="logbook.licenses.launches_24m">Launches (24 months)</div>
+        <div class="cc-value {{ 'cc-ok' if currency.ok_launches else 'cc-warn' }}">
+            {{ currency.window_flights }}
+        </div>
+        <div class="cc-sub {{ 'cc-ok' if currency.ok_launches else 'cc-warn' }}">
+            {% if currency.ok_launches %}
+            <i class="fas fa-check"></i> <span data-i18n="logbook.licenses.req_met">requirement met</span>
+            {% else %}
+            <span data-i18n="logbook.licenses.req_15">required 15</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="currency-card">
+        <div class="cc-label" data-i18n="logbook.licenses.fi_flights">FI(S) flights</div>
+        <div class="cc-value" style="font-size:1.2rem">—</div>
+        <div class="cc-sub cc-warn" data-i18n="logbook.licenses.fi_verify">verify in logbook</div>
+    </div>
+    <div class="currency-card">
+        <div class="cc-label" data-i18n="logbook.licenses.medical">Medical certificate</div>
+        {% if currency.medical_expiry %}
+            {% if currency.days_to_medical < 0 %}
+            <div class="cc-value cc-danger">{{ currency.medical_expiry }}</div>
+            <div class="cc-sub cc-danger" data-i18n="logbook.licenses.medical_expired">EXPIRED</div>
+            {% elif currency.days_to_medical <= 60 %}
+            <div class="cc-value cc-warn">{{ currency.medical_expiry }}</div>
+            <div class="cc-sub cc-warn">{{ currency.days_to_medical }} <span data-i18n="logbook.licenses.days_remaining">days remaining</span></div>
+            {% else %}
+            <div class="cc-value cc-ok">{{ currency.medical_expiry }}</div>
+            <div class="cc-sub cc-ok">{{ currency.days_to_medical }} <span data-i18n="logbook.licenses.days_remaining">days remaining</span></div>
+            {% endif %}
+        {% else %}
+        <div class="cc-value" style="font-size:1.2rem">—</div>
+        <div class="cc-sub cc-warn">
+            <a href="/logbook/settings" style="color:inherit" data-i18n="logbook.licenses.enter_date">enter date</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Launch methods recency -->
+<div class="section-title" data-i18n="logbook.licenses.launch_methods_section">Launch Methods — SFCL.130</div>
+<div class="method-grid">
+    {% set methods = [('W', 'W', 'Winch', 'logbook.licenses.method.winch', currency.days_since_w),
+                      ('S', 'S', 'Aerotow', 'logbook.licenses.method.aerotow', currency.days_since_s),
+                      ('E', 'TMG', 'Motor Glider', 'logbook.licenses.method.tmg', currency.days_since_tmg)] %}
+    {% for code, badge, fallback, i18n_key, days_since in methods %}
+    <div class="method-card">
+        <div class="method-badge" style="color:{% if days_since is none %}var(--gl-muted){% elif days_since > 180 %}var(--gl-danger){% elif days_since > 90 %}var(--gl-warning){% else %}var(--gl-success){% endif %}">
+            {{ badge }}
+        </div>
+        <div class="method-name" data-i18n="{{ i18n_key }}">{{ fallback }}</div>
+        {% if days_since is not none %}
+        <div class="method-days" style="color:{% if days_since > 180 %}var(--gl-danger){% elif days_since > 90 %}var(--gl-warning){% else %}var(--gl-success){% endif %}">
+            {{ days_since }} <span data-i18n="logbook.licenses.days_ago">days ago</span>
+        </div>
+        <div class="method-alert" data-i18n="logbook.licenses.alert_at_90">alert at &gt;90 days</div>
+        {% else %}
+        <div class="method-days" style="color:var(--gl-muted)" data-i18n="logbook.licenses.no_flights">no flights recorded</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Active alerts detailed -->
+<div class="section-title" data-i18n="logbook.licenses.active_alerts">Active Alerts</div>
+
+{% if alerts %}
+{% for a in alerts %}
+<div class="alert-card {{ a.level }}">
+    <div class="alert-card-header">
+        <span class="alert-card-icon" style="color:{% if a.level == 'success' %}var(--gl-success){% elif a.level == 'danger' %}var(--gl-danger){% elif a.level == 'warning' %}var(--gl-warning){% else %}var(--gl-info){% endif %}">
+            {% if a.level == 'success' %}<i class="fas fa-circle-check"></i>
+            {% elif a.level == 'danger' %}<i class="fas fa-circle-exclamation"></i>
+            {% elif a.level == 'warning' %}<i class="fas fa-triangle-exclamation"></i>
+            {% else %}<i class="fas fa-circle-info"></i>{% endif %}
+        </span>
+        <span class="alert-card-title">{{ a.title }}</span>
+        {% if a.level == 'success' %}
+        <span class="alert-card-badge badge-ok" data-i18n="logbook.alert.badge.ok">OK</span>
+        {% elif a.action == 'logbook.alert.action.check' %}
+        <span class="alert-card-badge badge-check" data-i18n="logbook.alert.badge.check">Check</span>
+        {% elif a.action == 'logbook.alert.action.fill_in' %}
+        <span class="alert-card-badge badge-fill" data-i18n="logbook.alert.badge.fill_in">Fill in</span>
+        {% elif a.level == 'danger' %}
+        <span class="alert-card-badge badge-alert" data-i18n="logbook.alert.badge.alert">Alert</span>
+        {% endif %}
+    </div>
+    {% if a.description %}
+    <div class="alert-desc">{{ a.description }}</div>
+    {% endif %}
+    {% if a.code %}
+    <div class="alert-code">{{ a.code }}</div>
+    {% endif %}
+    {% if a.level == 'success' %}
+    <div class="progress-req">
+        <div class="progress-track" style="margin-top:8px">
+            <div class="progress-bar success" style="width:100%"></div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+
+{% else %}
+<div class="empty" data-i18n="logbook.empty.no_alerts">No active alerts — everything looks good!</div>
+{% endif %}
+
+<!-- Winch operators section -->
+{% if winch_ops %}
+<div class="section-title" data-i18n="logbook.stats.winch_ops">Winch Operators this season</div>
+<div class="winch-card">
+    {% for op in winch_ops %}
+    <div class="winch-operator">
+        <div class="winch-avatar">{{ op.operator[:2].upper() if op.operator else '?' }}</div>
+        <div style="flex:1">
+            <div style="font-weight:500;font-size:0.875rem">{{ op.operator }}</div>
+            <div style="font-size:0.75rem;color:var(--gl-muted)">{{ op.launches }} <span data-i18n="logbook.stats.launches">launches</span></div>
+        </div>
+        <i class="fas fa-heart" style="color:#ef4444;font-size:0.9rem"></i>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Quick link to settings -->
+<div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+    <a class="btn btn-secondary" href="/logbook/settings">
+        <i class="fas fa-gear"></i> <span data-i18n="logbook.licenses.update_profile">Update profile &amp; dates</span>
+    </a>
+    <a class="btn btn-secondary" href="/logbook/flights">
+        <i class="fas fa-plane"></i> <span data-i18n="logbook.nav.flights">Flights</span>
+    </a>
+</div>
+
+{% endblock %}
