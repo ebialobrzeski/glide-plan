@@ -41,7 +41,13 @@ def sync_connector(db: Session, connector: Connector) -> SyncLog:
             stmt = (
                 insert(Flight)
                 .values(**flight_row)
-                .on_conflict_do_nothing(index_elements=['user_id', 'external_id'])
+                .on_conflict_do_update(
+                    index_elements=['user_id', 'external_id'],
+                    set_={
+                        'aircraft_type': flight_row['aircraft_type'],
+                        'aircraft_reg':  flight_row['aircraft_reg'],
+                    },
+                )
             )
             result = db.execute(stmt)
             if result.rowcount:
