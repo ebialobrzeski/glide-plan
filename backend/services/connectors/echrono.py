@@ -84,13 +84,17 @@ def _hhmm_to_minutes(value: str) -> Optional[int]:
 def _split_aircraft(aircraft_str: str) -> tuple[str, str]:
     """Split 'SZD-50-3 SP-3788' into (aircraft_type, aircraft_reg).
 
-    The registration is the last token that matches the pattern
-    LETTERS-ALPHANUMERIC (e.g. SP-3788, D-KOOL).
+    The registration starts at the LETTERS-ALPHANUMERIC token (e.g. SP-3788,
+    D-KOOL) and extends to the end of the string, including any short uppercase
+    suffix that follows (e.g. 'SP-3696 AB').
     """
     if not aircraft_str:
         return '', ''
     aircraft_str = aircraft_str.strip()
-    reg_match = re.search(r'\b([A-Z]{1,3}-[A-Z0-9]{3,6})\s*$', aircraft_str)
+    # Match a registration-like token optionally followed by a short uppercase
+    # suffix (e.g. "SP-3696 AB").  The suffix handles cases where the system
+    # appends a cabin/variant code after the main registration code.
+    reg_match = re.search(r'\b([A-Z]{1,3}-[A-Z0-9]{3,6}(?:\s+[A-Z]{1,4})?)\s*$', aircraft_str)
     if reg_match:
         aircraft_type = aircraft_str[: reg_match.start()].strip()
         aircraft_reg = reg_match.group(1)
@@ -111,12 +115,30 @@ def _normalize_json_flight(record: dict) -> dict:
     The canonical format mirrors the output of the HTML parser so that
     sync._build_flight_row() can process both without branching.
     """
-    # Aircraft: split combined string if needed
+    # Aircraft: split combined string if needed.
+    # Some echrono records use a single 'aircraft' field ("SZD-50-3 SP-3788"),
+    # others supply 'aircraft_type' and 'aircraft_reg' separately.  In the
+    # latter case the type field may contain an embedded registration
+    # (e.g. aircraft_type="SZD-51-1 SP-3696", aircraft_reg="AB"), so we
+    # re-split only when the type field contains a registration-like token
+    # (identified by a LETTERS-DIGITS dash pattern).
+    _REG_PATTERN = re.compile(r'\b[A-Z]{1,3}-[A-Z0-9]{3,6}\b')
     if 'aircraft' in record:
         aircraft_type, aircraft_reg = _split_aircraft(record['aircraft'])
     else:
-        aircraft_type = record.get('aircraft_type', '')
-        aircraft_reg = record.get('aircraft_reg', '')
+        raw_type = record.get('aircraft_type', '')
+        raw_reg  = record.get('aircraft_reg', '')
+        if _REG_PATTERN.search(raw_type):
+            # type field has an embedded registration — re-split and merge suffix
+            aircraft_type, embedded_reg = _split_aircraft(raw_type)
+            aircraft_reg = (embedded_reg + ' ' + raw_reg).strip() if raw_reg else embedded_reg
+        else:
+            aircraft_type = raw_type
+            aircraft_reg  = raw_reg
+        logger.debug(
+            'eChronometraż aircraft: raw_type=%r raw_reg=%r -> type=%r reg=%r',
+            raw_type, raw_reg, aircraft_type, aircraft_reg,
+        )
 
     # Flight time: convert HH:MM → minutes if the integer form is missing
     if 'flight_time_min' in record:
