@@ -36,6 +36,7 @@ services:
       - BASE_URL=${BASE_URL:-}
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - RESEND_FROM_ADDRESS=${RESEND_FROM_ADDRESS:-noreply@glideplan.org}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
     depends_on:
       postgres_gliding:
         condition: service_healthy
