@@ -210,6 +210,12 @@ def flights_page():
     return render_template('logbook/flights.html')
 
 
+@logbook_bp.route('/fun-stats', methods=['GET'])
+@login_required
+def fun_stats_page():
+    return render_template('logbook/fun_stats.html')
+
+
 @logbook_bp.route('/connectors', methods=['GET'])
 @login_required
 def connectors_page():
