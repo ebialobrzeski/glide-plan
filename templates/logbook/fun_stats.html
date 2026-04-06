@@ -1,0 +1,436 @@
+{% extends 'logbook/base.html' %}
+{% block title %}<span data-i18n="logbook.fun_stats.page_title">Fun Stats</span>{% endblock %}
+{% block page_title %}<span data-i18n="logbook.fun_stats.page_title">Fun Stats</span>{% endblock %}
+
+{% block head %}
+<style>
+/* ── Fun stats layout ───────────────────────────────────────────────────── */
+.fun-subtitle {
+    font-size: 0.9rem;
+    color: var(--gl-muted);
+    margin-bottom: 24px;
+}
+.fun-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+/* ── Fun stat card ──────────────────────────────────────────────────────── */
+.fun-card {
+    background: var(--gl-surface);
+    border: 1px solid var(--gl-border);
+    border-radius: 12px;
+    padding: 20px 20px 20px 24px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--gl-shadow);
+    transition: transform .15s, box-shadow .15s;
+}
+.fun-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--gl-shadow-md);
+}
+.fun-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    border-radius: 12px 0 0 12px;
+}
+/* Cycle accent colours by position */
+.fun-card:nth-child(8n+1)::before { background: #2563eb; }
+.fun-card:nth-child(8n+2)::before { background: #7c3aed; }
+.fun-card:nth-child(8n+3)::before { background: #059669; }
+.fun-card:nth-child(8n+4)::before { background: #d97706; }
+.fun-card:nth-child(8n+5)::before { background: #db2777; }
+.fun-card:nth-child(8n+6)::before { background: #0891b2; }
+.fun-card:nth-child(8n+7)::before { background: #65a30d; }
+.fun-card:nth-child(8n+8)::before { background: #dc2626; }
+
+.fun-card-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--gl-text);
+    margin-bottom: 4px;
+}
+.fun-card-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--gl-muted);
+    margin-bottom: 10px;
+}
+.fun-card-comment {
+    font-size: 0.83rem;
+    color: var(--gl-text);
+    line-height: 1.5;
+    opacity: .85;
+}
+
+/* ── Skeleton loader ────────────────────────────────────────────────────── */
+@keyframes shimmer {
+    0%   { background-position: -600px 0; }
+    100% { background-position:  600px 0; }
+}
+.skeleton {
+    border-radius: 8px;
+    background: linear-gradient(90deg,
+        var(--gl-border) 25%,
+        var(--gl-bg) 50%,
+        var(--gl-border) 75%
+    );
+    background-size: 600px 100%;
+    animation: shimmer 1.4s infinite linear;
+}
+.skeleton-card {
+    background: var(--gl-surface);
+    border: 1px solid var(--gl-border);
+    border-radius: 12px;
+    padding: 20px 20px 20px 24px;
+    box-shadow: var(--gl-shadow);
+}
+.sk-value  { height: 28px; width: 55%; margin-bottom: 8px; }
+.sk-title  { height: 12px; width: 35%; margin-bottom: 14px; }
+.sk-comment{ height: 12px; width: 90%; margin-bottom: 6px; }
+.sk-comment2{ height: 12px; width: 70%; }
+
+/* ── Footer strip ───────────────────────────────────────────────────────── */
+.fun-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--gl-surface);
+    border: 1px solid var(--gl-border);
+    border-radius: 10px;
+    font-size: 0.78rem;
+    color: var(--gl-muted);
+}
+.fun-footer .meta { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; }
+.fun-footer .meta span { display: flex; align-items: center; gap: 5px; }
+.fun-disclaimer {
+    font-size: 0.72rem;
+    color: var(--gl-muted);
+    opacity: .7;
+    font-style: italic;
+}
+
+/* ── Refresh button ─────────────────────────────────────────────────────── */
+.fun-actions { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.fun-cooldown {
+    font-size: 0.78rem;
+    color: var(--gl-muted);
+}
+
+/* ── Alert / error ──────────────────────────────────────────────────────── */
+.fun-alert {
+    padding: 16px 20px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    margin-bottom: 20px;
+    display: none;
+}
+.fun-alert.show { display: block; }
+.fun-alert.error { background: rgba(220,38,38,.08); color: var(--gl-danger); border: 1px solid rgba(220,38,38,.2); }
+.fun-alert.info  { background: rgba(8,145,178,.08);  color: var(--gl-info);   border: 1px solid rgba(8,145,178,.2); }
+</style>
+{% endblock %}
+
+{% block content %}
+<p class="fun-subtitle" data-i18n="logbook.fun_stats.subtitle">Your flights, but make it fun</p>
+
+<!-- Actions row -->
+<div class="fun-actions">
+    <button id="btn-refresh" class="btn btn-primary btn-sm" onclick="triggerRefresh()">
+        <i class="fas fa-wand-magic-sparkles"></i>
+        <span data-i18n="logbook.fun_stats.refresh">Regenerate</span>
+    </button>
+    <span id="cooldown-label" class="fun-cooldown" style="display:none"></span>
+</div>
+
+<!-- Alerts -->
+<div id="fun-alert" class="fun-alert"></div>
+
+<!-- Skeleton (shown while generating) -->
+<div id="skeleton-grid" class="fun-grid" style="display:none">
+    {% for _ in range(8) %}
+    <div class="skeleton-card">
+        <div class="skeleton sk-value"></div>
+        <div class="skeleton sk-title"></div>
+        <div class="skeleton sk-comment"></div>
+        <div class="skeleton sk-comment2"></div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Generating hint -->
+<div id="generating-hint" style="display:none; margin-bottom:12px; font-size:0.82rem; color:var(--gl-muted)">
+    <i class="fas fa-spinner fa-spin"></i>
+    <span data-i18n="logbook.fun_stats.generating">Generating your stats…</span>
+    <span data-i18n="logbook.fun_stats.generating_hint">This may take a few seconds.</span>
+</div>
+
+<!-- Stats grid -->
+<div id="stats-grid" class="fun-grid" style="display:none"></div>
+
+<!-- Footer -->
+<div id="fun-footer" class="fun-footer" style="display:none">
+    <div class="meta">
+        <span>
+            <i class="fas fa-clock"></i>
+            <span data-i18n="logbook.fun_stats.generated_at">Generated at</span>:
+            <strong id="footer-generated-at"></strong>
+        </span>
+        <span>
+            <i class="fas fa-robot"></i>
+            <span data-i18n="logbook.fun_stats.model_used">Model</span>:
+            <strong id="footer-model"></strong>
+        </span>
+    </div>
+    <span class="fun-disclaimer" data-i18n="logbook.fun_stats.disclaimer">For fun only — not official statistics.</span>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    const POLL_INTERVAL_MS = 2000;
+    const POLL_TIMEOUT_MS  = 30000;
+
+    let pollTimer   = null;
+    let pollElapsed = 0;
+
+    // ── i18n helpers ──────────────────────────────────────────────────────
+    function t(key, fallback) {
+        return (window.i18n && window.i18n.t) ? window.i18n.t(key, fallback) : fallback;
+    }
+
+    // ── DOM refs ──────────────────────────────────────────────────────────
+    const elGrid      = document.getElementById('stats-grid');
+    const elSkeleton  = document.getElementById('skeleton-grid');
+    const elHint      = document.getElementById('generating-hint');
+    const elFooter    = document.getElementById('fun-footer');
+    const elAlert     = document.getElementById('fun-alert');
+    const elCooldown  = document.getElementById('cooldown-label');
+    const btnRefresh  = document.getElementById('btn-refresh');
+
+    // ── State helpers ─────────────────────────────────────────────────────
+    function showSkeleton() {
+        elSkeleton.style.display = 'grid';
+        elHint.style.display     = 'block';
+        elGrid.style.display     = 'none';
+        elFooter.style.display   = 'none';
+    }
+
+    function hideSkeleton() {
+        elSkeleton.style.display = 'none';
+        elHint.style.display     = 'none';
+    }
+
+    function showAlert(msg, type) {
+        elAlert.textContent = msg;
+        elAlert.className   = 'fun-alert show ' + type;
+    }
+
+    function hideAlert() {
+        elAlert.className = 'fun-alert';
+    }
+
+    // ── Render cards ──────────────────────────────────────────────────────
+    function renderStats(stats, generatedAt, modelUsed) {
+        hideSkeleton();
+        hideAlert();
+        elGrid.innerHTML = '';
+
+        stats.forEach(function (s) {
+            const card = document.createElement('div');
+            card.className = 'fun-card';
+            card.innerHTML =
+                '<div class="fun-card-value">' + _esc(s.value)   + '</div>' +
+                '<div class="fun-card-title">' + _esc(s.title)   + '</div>' +
+                '<div class="fun-card-comment">' + _esc(s.comment) + '</div>';
+            elGrid.appendChild(card);
+        });
+
+        elGrid.style.display = 'grid';
+
+        // Footer
+        const dt = new Date(generatedAt);
+        document.getElementById('footer-generated-at').textContent =
+            dt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+        document.getElementById('footer-model').textContent = modelUsed || '—';
+        elFooter.style.display = 'flex';
+    }
+
+    function _esc(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // ── Polling ───────────────────────────────────────────────────────────
+    function startPolling() {
+        pollElapsed = 0;
+        pollTimer = setInterval(function () {
+            pollElapsed += POLL_INTERVAL_MS;
+            if (pollElapsed >= POLL_TIMEOUT_MS) {
+                stopPolling();
+                hideSkeleton();
+                showAlert(t('logbook.fun_stats.timeout', 'Generation took too long. Please try again.'), 'error');
+                btnRefresh.disabled = false;
+                return;
+            }
+            fetchStats();
+        }, POLL_INTERVAL_MS);
+    }
+
+    function stopPolling() {
+        if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    // ── API calls ─────────────────────────────────────────────────────────
+    function fetchStats() {
+        fetch('/logbook/api/stats/fun', { credentials: 'same-origin' })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+            .then(function (res) {
+                if (res.data.from_cache) {
+                    stopPolling();
+                    renderStats(res.data.stats, res.data.generated_at, res.data.model_used);
+                    btnRefresh.disabled = false;
+                    applyCooldown(res.data.generated_at);
+                } else if (res.data.error) {
+                    stopPolling();
+                    hideSkeleton();
+                    btnRefresh.disabled = false;
+                    showAlert(t('logbook.fun_stats.error', 'Could not load fun stats. Try again later.'), 'error');
+                } else if (res.data.generating) {
+                    // still generating — keep polling (skeleton already shown)
+                } else {
+                    stopPolling();
+                    hideSkeleton();
+                    showAlert(t('logbook.fun_stats.error', 'Could not load fun stats. Try again later.'), 'error');
+                    btnRefresh.disabled = false;
+                }
+            })
+            .catch(function () {
+                stopPolling();
+                hideSkeleton();
+                showAlert(t('logbook.fun_stats.error', 'Could not load fun stats. Try again later.'), 'error');
+                btnRefresh.disabled = false;
+            });
+    }
+
+    // ── Cooldown display ──────────────────────────────────────────────────
+    function applyCooldown(generatedIso) {
+        const generatedMs = new Date(generatedIso).getTime();
+        const expiresMs   = generatedMs + 24 * 3600 * 1000;
+        const nowMs       = Date.now();
+        const secsLeft    = Math.floor((expiresMs - nowMs) / 1000);
+
+        if (secsLeft > 0) {
+            btnRefresh.disabled = true;
+            const h = Math.floor(secsLeft / 3600);
+            const m = Math.floor((secsLeft % 3600) / 60);
+            const timeStr = (h > 0 ? h + 'h ' : '') + m + 'min';
+            const label = t('logbook.fun_stats.refresh_unavail', 'Available again in {time}')
+                            .replace('{time}', timeStr);
+            elCooldown.textContent  = label;
+            elCooldown.style.display = 'inline';
+        } else {
+            btnRefresh.disabled      = false;
+            elCooldown.style.display = 'none';
+        }
+    }
+
+    // ── Refresh trigger ───────────────────────────────────────────────────
+    window.triggerRefresh = function () {
+        hideAlert();
+        btnRefresh.disabled = true;
+        elCooldown.style.display = 'none';
+        showSkeleton();
+        stopPolling();
+
+        fetch('/logbook/api/stats/fun/refresh', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+        })
+            .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+            .then(function (res) {
+                if (res.status === 429) {
+                    hideSkeleton();
+                    btnRefresh.disabled = false;
+                    showAlert(res.data.message || t('logbook.fun_stats.error', 'Too many requests.'), 'info');
+                    if (res.data.next_available) {
+                        // recompute from server's next_available
+                        const secsLeft = Math.max(0,
+                            Math.floor((new Date(res.data.next_available).getTime() - Date.now()) / 1000)
+                        );
+                        const h = Math.floor(secsLeft / 3600);
+                        const m = Math.floor((secsLeft % 3600) / 60);
+                        const timeStr = (h > 0 ? h + 'h ' : '') + m + 'min';
+                        const label = t('logbook.fun_stats.refresh_unavail', 'Available again in {time}')
+                                        .replace('{time}', timeStr);
+                        elCooldown.textContent  = label;
+                        elCooldown.style.display = 'inline';
+                    }
+                } else if (res.data.message === 'generating') {
+                    startPolling();
+                } else {
+                    hideSkeleton();
+                    btnRefresh.disabled = false;
+                    showAlert(t('logbook.fun_stats.error', 'Could not load fun stats. Try again later.'), 'error');
+                }
+            })
+            .catch(function () {
+                hideSkeleton();
+                btnRefresh.disabled = false;
+                showAlert(t('logbook.fun_stats.error', 'Could not load fun stats. Try again later.'), 'error');
+            });
+    };
+
+    // ── Initial load ──────────────────────────────────────────────────────
+    (function init() {
+        btnRefresh.disabled = true;
+        showSkeleton();
+
+        fetch('/logbook/api/stats/fun', { credentials: 'same-origin' })
+            .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+            .then(function (res) {
+                if (res.data.from_cache) {
+                    hideSkeleton();
+                    renderStats(res.data.stats, res.data.generated_at, res.data.model_used);
+                    btnRefresh.disabled = false;
+                    applyCooldown(res.data.generated_at);
+                } else if (res.data.error) {
+                    hideSkeleton();
+                    btnRefresh.disabled = false;
+                    showAlert(t('logbook.fun_stats.error', 'Could not load fun stats. Try again later.'), 'error');
+                } else if (res.data.generating) {
+                    // 202 — auto-trigger generation and start polling
+                    triggerRefresh();
+                } else {
+                    hideSkeleton();
+                    btnRefresh.disabled = false;
+                    showAlert(t('logbook.fun_stats.error', 'Could not load fun stats. Try again later.'), 'error');
+                }
+            })
+            .catch(function () {
+                hideSkeleton();
+                btnRefresh.disabled = false;
+                showAlert(t('logbook.fun_stats.error', 'Could not load fun stats. Try again later.'), 'error');
+            });
+    })();
+})();
+</script>
+{% endblock %}

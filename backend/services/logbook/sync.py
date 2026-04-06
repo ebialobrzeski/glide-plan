@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import date, datetime, timezone
 
 from sqlalchemy import update as sa_update
@@ -78,6 +79,11 @@ def sync_connector(db: Session, connector: Connector) -> SyncLog:
         )
         db.commit()
         logger.info('Sync success for connector %s: %s', connector_id, msg)
+
+        # Auto-regenerate fun stats if new flights arrived
+        if imported > 0:
+            _trigger_fun_stats_regen(user_id, connector)
+
         return log
 
     except Exception as exc:
@@ -133,6 +139,29 @@ def sync_all_users(db: Session) -> None:
             sync_connector(db, connector)  # commits internally
         except Exception:
             logger.exception('Background sync failed for connector %s', connector.id)
+
+
+def _trigger_fun_stats_regen(user_id, connector: Connector) -> None:
+    """Fire-and-forget: regenerate fun stats for the user in a background thread."""
+    from backend.db import get_db as _get_db
+    from backend.models.user import User
+    from backend.services.logbook import fun_stats as fun_stats_svc
+
+    def _worker():
+        db = _get_db()
+        try:
+            user = db.query(User).get(user_id)
+            language = (user.preferred_language if user else None) or 'pl'
+            stats = fun_stats_svc.collect_pilot_stats(db, user_id)
+            result, model = fun_stats_svc.generate_fun_stats(stats, language)
+            if result:
+                fun_stats_svc.upsert_cache(db, user_id, result, model)
+        except Exception:
+            logger.warning('fun_stats auto-regen failed for user %s', user_id, exc_info=True)
+        finally:
+            db.close()
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 
 def _build_flight_row(raw: dict, connector: Connector) -> dict:
