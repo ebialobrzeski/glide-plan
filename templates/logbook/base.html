@@ -70,10 +70,18 @@
         /* ── App shell ───────────────────────────────────────────────────── */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--gl-bg);
+            background: #0f172a; /* gutter colour — always matches sidebar */
             color: var(--gl-text);
             min-height: 100vh;
+        }
+
+        /* Max-width wrapper — centres the whole app on wide screens */
+        .gl-app-wrapper {
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
             display: flex;
+            min-height: 100vh;
         }
 
         /* ── Sidebar ──────────────────────────────────────────────────────── */
@@ -82,10 +90,10 @@
             background: var(--gl-sidebar-bg);
             display: flex;
             flex-direction: column;
-            position: fixed;
+            position: sticky;
             top: 0;
-            left: 0;
-            bottom: 0;
+            height: 100vh;
+            flex-shrink: 0;
             z-index: 50;
             overflow-y: auto;
         }
@@ -199,11 +207,11 @@
 
         /* ── Main area ────────────────────────────────────────────────────── */
         .gl-main {
-            margin-left: var(--gl-sidebar-w);
             flex: 1;
             display: flex;
             flex-direction: column;
             min-height: 100vh;
+            background: var(--gl-bg);
         }
 
         /* ── Top bar ──────────────────────────────────────────────────────── */
@@ -260,9 +268,6 @@
         .gl-content {
             flex: 1;
             padding: 20px 22px 36px;
-            max-width: 1300px;
-            width: 100%;
-            margin: 0 auto;
         }
 
         /* ── Cards ────────────────────────────────────────────────────────── */
@@ -455,7 +460,13 @@
         /* ── Responsive ───────────────────────────────────────────────────── */
         @media (max-width: 640px) {
             .gl-nav-toggle { display: flex; align-items: center; }
+            .gl-app-wrapper { display: block; }
             .gl-sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                height: 100vh;
                 transform: translateX(-100%);
                 transition: transform .25s ease;
             }
@@ -463,13 +474,13 @@
                 transform: translateX(0);
             }
             .gl-sidebar-overlay.open { display: block; }
-            .gl-main   { margin-left: 0; }
             .gl-content { padding: 16px; }
         }
     </style>
     {% block head %}{% endblock %}
 </head>
 <body>
+<div class="gl-app-wrapper">
 
 <!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
 <aside class="gl-sidebar">
@@ -551,6 +562,7 @@
 <!-- ── Main area ──────────────────────────────────────────────────────────── -->
 <div class="gl-main">
 
+
     <!-- Top bar -->
     <header class="gl-topbar">
         <button class="gl-nav-toggle" id="navToggle" aria-label="Open menu" data-i18n-title="logbook.nav.open_menu">
@@ -583,7 +595,9 @@
     <main class="gl-content">
         {% block content %}{% endblock %}
     </main>
-</div>
+</div><!-- /.gl-main -->
+
+</div><!-- /.gl-app-wrapper -->
 
 <!-- Toast container -->
 <div id="toast"></div>
