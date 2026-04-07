@@ -27,7 +27,6 @@
         /* ── Design tokens — light theme ────────────────────────────────── */
         :root {
             --gl-sidebar-w: 220px;
-            --gl-topbar-h: 52px;
 
             /* Matches main GlidePlan app --background / --surface / --border */
             --gl-bg:       #f8fafc;
@@ -47,9 +46,6 @@
             --gl-sidebar-text:  #94a3b8;
             --gl-sidebar-hover: rgba(255,255,255,.07);
             --gl-sidebar-active:#2563eb;
-
-            --gl-topbar-bg:     #1e293b;
-            --gl-topbar-text:   #cbd5e1;
 
             /* Matches main app --shadow: very crisp, minimal */
             --gl-shadow: 0 1px 3px 0 rgba(0,0,0,.1);
@@ -214,60 +210,72 @@
             background: var(--gl-bg);
         }
 
-        /* ── Top bar ──────────────────────────────────────────────────────── */
+        /* ── Top bar — mirrors GlidePlan's modern-header card exactly ───── */
         .gl-topbar {
-            height: var(--gl-topbar-h);
-            background: var(--gl-topbar-bg);
+            background: var(--gl-surface);
+            border-radius: 12px;
+            box-shadow: var(--gl-shadow);
             display: flex;
             align-items: center;
-            padding: 0 20px;
-            gap: 10px;
-            position: sticky;
-            top: 0;
-            z-index: 40;
+            justify-content: space-between;
+            padding: 10px 16px;
+            gap: 8px;
+            margin: 12px 16px 12px;
         }
-        .gl-topbar-title {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: #e2e8f0;
+        /* Brand block — mirrors .header-brand + .header-text */
+        .gl-topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .gl-topbar-logo {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            object-fit: contain;
+        }
+        .gl-topbar-appname {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--gl-text);
+            line-height: 1.2;
+            margin: 0;
+        }
+        .gl-topbar-appname span { color: var(--gl-primary); }
+        .gl-topbar-subtitle {
+            font-size: 0.85rem;
+            color: var(--gl-muted);
+            margin: 0;
         }
         .gl-topbar-spacer { flex: 1; }
         .gl-topbar-user {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 0.82rem;
-            color: var(--gl-topbar-text);
+            font-size: 0.85rem;
+            color: var(--gl-muted);
         }
-        .gl-avatar {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
+        .gl-topbar-app-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 16px;
+            border-radius: 8px;
             background: var(--gl-primary);
             color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.72rem;
-            font-weight: 700;
-            flex-shrink: 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            line-height: 1;
+            transition: background .15s;
         }
-
-        /* Shoelace overrides for dark topbar context */
-        .gl-topbar sl-select {
-            --sl-input-background-color: rgba(255,255,255,.05);
-            --sl-input-border-color: rgba(255,255,255,.12);
-            --sl-input-color: #cbd5e1;
-            --sl-input-font-size-small: 0.8rem;
-        }
-        .gl-topbar sl-icon-button::part(base) { color: var(--gl-topbar-text); }
-        .gl-topbar sl-icon-button::part(base):hover { color: #fff; background: rgba(255,255,255,.08); border-radius: 6px; }
-        .gl-topbar sl-divider { height: 20px; --color: rgba(255,255,255,.15); }
+        .gl-topbar-app-btn:hover { background: var(--gl-primary-h); color: #fff; }
+        .gl-topbar sl-divider { height: 20px; }
 
         /* ── Content ──────────────────────────────────────────────────────── */
         .gl-content {
             flex: 1;
-            padding: 20px 22px 36px;
+            padding: 0 16px 36px;
         }
 
         /* ── Cards ────────────────────────────────────────────────────────── */
@@ -563,15 +571,38 @@
 <div class="gl-main">
 
 
-    <!-- Top bar -->
+    <!-- Top bar — same structure as GlidePlan's modern-header -->
     <header class="gl-topbar">
+        <!-- Mobile hamburger (hidden on desktop via sidebar always visible) -->
         <button class="gl-nav-toggle" id="navToggle" aria-label="Open menu" data-i18n-title="logbook.nav.open_menu">
             <i class="fas fa-bars"></i>
         </button>
-        <span class="gl-topbar-title">{% block page_title %}GlideLog{% endblock %}</span>
+
+        <!-- Brand: logo + app name + subtitle — mirrors GlidePlan's header-brand -->
+        <div class="gl-topbar-brand">
+            <img src="/static/images/logo.png" alt="GlideLog" class="gl-topbar-logo">
+            <div>
+                <p class="gl-topbar-appname">Glide<span>Log</span></p>
+                <p class="gl-topbar-subtitle" data-i18n="logbook.brand.subtitle">Flight Logbook</p>
+            </div>
+        </div>
+
+        <!-- App-switch button — same position as GlideLog btn in GlidePlan -->
+        <a href="/" class="gl-topbar-app-btn" title="Back to GlidePlan">
+            <img src="/static/images/logo.png" alt="" style="width:18px;height:18px;border-radius:3px;"> GlidePlan
+        </a>
+
         <div class="gl-topbar-spacer"></div>
 
-        <!-- Language selector — pre-populated; i18n.js overwrites on load -->
+        <!-- Right side: tier badge + name + logout — mirrors GlidePlan's auth-logged-in -->
+        <div class="gl-topbar-user">
+            <sl-badge variant="{% if current_user.tier == 'admin' %}success{% elif current_user.tier == 'premium' %}primary{% else %}neutral{% endif %}" pill>{{ current_user.tier.upper() }}</sl-badge>
+            <span>{{ current_user.display_name }}</span>
+            <sl-icon-button name="box-arrow-right" href="/auth/logout" data-i18n-title="logbook.nav.logout" label="Log out"></sl-icon-button>
+        </div>
+        <sl-divider vertical></sl-divider>
+
+        <!-- Language selector -->
         <sl-select id="lang-selector" size="small" style="width:140px;" title="Language">
             <sl-option value="en">🇬🇧 English</sl-option>
             <sl-option value="pl">🇵🇱 Polski</sl-option>
@@ -582,13 +613,6 @@
 
         <!-- Theme toggle -->
         <sl-icon-button name="moon" id="theme-toggle" label="Toggle theme"></sl-icon-button>
-        <sl-divider vertical></sl-divider>
-
-        <!-- User -->
-        <div class="gl-topbar-user">
-            <div class="gl-avatar" id="user-avatar">{{ current_user.display_name[:2].upper() }}</div>
-            <span>{{ current_user.display_name }}</span>
-        </div>
     </header>
 
     <!-- Content -->
