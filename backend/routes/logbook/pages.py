@@ -193,15 +193,18 @@ def licenses_page():
     window_730      = stats_svc.flights_in_window(db, current_user, window_days=730)
     last_per_method = stats_svc.last_flights_per_method(db, current_user)
 
+    window_90       = stats_svc.flights_in_window(db, current_user, window_days=90)
+    pic_totals      = stats_svc.pic_totals(db, current_user)
+
     currency   = alerts_svc.get_currency_summary(db, current_user,
                                                   _window_730=window_730,
                                                   _last_per_method=last_per_method)
     alerts     = alerts_svc.get_alerts(db, current_user,
                                         _window_730=window_730,
-                                        _last_per_method=last_per_method)
+                                        _last_per_method=last_per_method,
+                                        _window_90=window_90,
+                                        _pic_totals=pic_totals)
     winch_ops  = stats_svc.by_winch_operator(db, current_user)
-    window_90  = stats_svc.flights_in_window(db, current_user, window_days=90)
-    pic_totals = stats_svc.pic_totals(db, current_user)
 
     return render_template(
         'logbook/licenses.html',

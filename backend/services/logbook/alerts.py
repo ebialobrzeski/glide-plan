@@ -55,11 +55,13 @@ def _alert(level: str, code: str, title: str, description: str = '',
 
 def get_alerts(db: Session, user: User,
                _window_730: Optional[dict] = None,
-               _last_per_method: Optional[dict] = None) -> list[dict]:
+               _last_per_method: Optional[dict] = None,
+               _window_90: Optional[dict] = None,
+               _pic_totals: Optional[dict] = None) -> list[dict]:
     """Return a list of all active alerts for the given user.
 
-    Pass pre-computed _window_730 / _last_per_method to avoid duplicate DB
-    queries when called alongside get_currency_summary() on the same request.
+    Pass pre-computed kwargs to avoid duplicate DB queries when called
+    alongside get_currency_summary() or the licenses page route.
     """
     alerts: list[dict] = []
     today = date.today()
@@ -68,8 +70,10 @@ def get_alerts(db: Session, user: User,
     profile = getattr(user, 'pilot_profile', None)
 
     # Shared data — compute once, reuse across checkers
-    window_730     = _window_730     or stats_svc.flights_in_window(db, user, window_days=730)
+    window_730      = _window_730      or stats_svc.flights_in_window(db, user, window_days=730)
     last_per_method = _last_per_method or stats_svc.last_flights_per_method(db, user)
+    window_90       = _window_90       or stats_svc.flights_in_window(db, user, window_days=90)
+    pic             = _pic_totals      or stats_svc.pic_totals(db, user)
 
     # ── SFCL.160(a) — Biennial currency ─────────────────────────────────────
     alerts.extend(_check_biennial_currency(db, user, today, window=window_730))
@@ -78,10 +82,10 @@ def get_alerts(db: Session, user: User,
     alerts.extend(_check_launch_recency(today, last_per_method))
 
     # ── FCL.060 — Recent experience for passenger carriage ──────────────────
-    alerts.extend(_check_passenger_recency(db, user, today))
+    alerts.extend(_check_passenger_recency(window_90))
 
     # ── SFCL.115(b) — Passenger carriage thresholds ─────────────────────────
-    alerts.extend(_check_passenger_thresholds(db, user, today, profile))
+    alerts.extend(_check_passenger_thresholds(pic, today, profile))
 
     # ── Part-MED — Medical certificate ──────────────────────────────────────
     alerts.extend(_check_medical(user, today, profile))
@@ -243,10 +247,9 @@ def _check_launch_recency(today: date, last_per_method: dict) -> list[dict]:
     return alerts
 
 
-def _check_passenger_recency(db: Session, user: User, today: date) -> list[dict]:
+def _check_passenger_recency(window_90: dict) -> list[dict]:
     """FCL.060 — 3 T/O + 3 landings as PIC in last 90 days before carrying a passenger."""
     alerts: list[dict] = []
-    window_90 = stats_svc.flights_in_window(db, user, window_days=90)
 
     if window_90['flights'] < 3:
         alerts.append(_alert(
@@ -262,10 +265,9 @@ def _check_passenger_recency(db: Session, user: User, today: date) -> list[dict]
     return alerts
 
 
-def _check_passenger_thresholds(db: Session, user: User, today: date, profile) -> list[dict]:
+def _check_passenger_thresholds(pic: dict, today: date, profile) -> list[dict]:
     """SFCL.115(b) — passenger carriage thresholds (30 PIC for first, 200 for hire/reward)."""
     alerts: list[dict] = []
-    pic = stats_svc.pic_totals(db, user)
 
     pre_launches = getattr(profile, 'pic_launches_pre_logbook', 0) or 0
     total_launches = pic['flights'] + pre_launches
