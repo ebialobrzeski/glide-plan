@@ -17,12 +17,25 @@
     const STORAGE_KEY = 'glideplan_lang';
     const FALLBACK_LANG = 'en';
     const SUPPORTED = ['en', 'pl', 'de', 'cs'];
+    const CACHE_PREFIX = 'glideplan_i18n_';
 
     let _translations = {};
     let _languages = [];
     let _currentLang = FALLBACK_LANG;
     let _ready = false;
     const _readyCallbacks = [];
+
+    function _loadCache(lang) {
+        try {
+            const raw = localStorage.getItem(CACHE_PREFIX + lang);
+            if (raw) { _translations = JSON.parse(raw); return true; }
+        } catch (_) {}
+        return false;
+    }
+
+    function _saveCache(lang, translations) {
+        try { localStorage.setItem(CACHE_PREFIX + lang, JSON.stringify(translations)); } catch (_) {}
+    }
 
     // ── Language detection ────────────────────────────────────────────────────
 
@@ -54,6 +67,7 @@
             const data = await res.json();
             if (data.success) {
                 _translations = data.translations;
+                _saveCache(lang, data.translations);
                 return true;
             }
         } catch (_) { /* non-fatal */ }
@@ -111,6 +125,17 @@
         });
         // HTML lang attribute
         document.documentElement.lang = _currentLang;
+        // Page title: if the <title> element contains a raw <span data-i18n="...">
+        // (because Jinja rendered it into RCDATA context), extract the key and
+        // replace document.title with the translated string.
+        const titleMatch = document.title.match(/data-i18n="([^"]+)"/);
+        if (titleMatch) {
+            const key = titleMatch[1];
+            const val = _translations[key];
+            if (val !== undefined) {
+                document.title = document.title.replace(/<span[^>]*>.*?<\/span>/s, val);
+            }
+        }
     }
 
     // ── Language selector UI ──────────────────────────────────────────────────
@@ -210,7 +235,9 @@
 
     async function _init() {
         _currentLang = _detectLang();
-        // Run language list and translations in parallel
+        // Apply cached translations immediately — eliminates the untranslated flash
+        if (_loadCache(_currentLang)) _applyToDOM();
+        // Fetch fresh translations (and language list) in parallel
         await Promise.all([
             _fetchLanguages(),
             _fetchTranslations(_currentLang),
