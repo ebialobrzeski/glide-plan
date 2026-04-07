@@ -239,19 +239,21 @@
             font-size: 0.82rem;
             color: var(--gl-topbar-text);
         }
-        .gl-avatar {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: var(--gl-primary);
-            color: #fff;
-            display: flex;
+        .gl-topbar-app-btn {
+            display: inline-flex;
             align-items: center;
-            justify-content: center;
-            font-size: 0.72rem;
-            font-weight: 700;
-            flex-shrink: 0;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: rgba(255,255,255,.1);
+            color: #e2e8f0;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-decoration: none;
+            line-height: 1;
+            transition: background .15s;
         }
+        .gl-topbar-app-btn:hover { background: rgba(255,255,255,.18); color: #fff; }
 
         /* Shoelace overrides for dark topbar context */
         .gl-topbar sl-select {
@@ -571,7 +573,19 @@
         <span class="gl-topbar-title">{% block page_title %}GlideLog{% endblock %}</span>
         <div class="gl-topbar-spacer"></div>
 
-        <!-- Language selector — pre-populated; i18n.js overwrites on load -->
+        <!-- User info -->
+        <div class="gl-topbar-user">
+            <sl-badge variant="{% if current_user.tier == 'admin' %}success{% elif current_user.tier == 'premium' %}primary{% else %}neutral{% endif %}" pill>{{ current_user.tier.upper() }}</sl-badge>
+            <span>{{ current_user.display_name }}</span>
+        </div>
+
+        <!-- GlidePlan app switch -->
+        <a href="/" class="gl-topbar-app-btn" title="Back to GlidePlan">
+            <img src="/static/images/logo.png" alt="" style="width:16px;height:16px;border-radius:3px;"> GlidePlan
+        </a>
+
+        <sl-divider vertical></sl-divider>
+
         <sl-select id="lang-selector" size="small" style="width:140px;" title="Language">
             <sl-option value="en">🇬🇧 English</sl-option>
             <sl-option value="pl">🇵🇱 Polski</sl-option>
@@ -582,13 +596,6 @@
 
         <!-- Theme toggle -->
         <sl-icon-button name="moon" id="theme-toggle" label="Toggle theme"></sl-icon-button>
-        <sl-divider vertical></sl-divider>
-
-        <!-- User -->
-        <div class="gl-topbar-user">
-            <div class="gl-avatar" id="user-avatar">{{ current_user.display_name[:2].upper() }}</div>
-            <span>{{ current_user.display_name }}</span>
-        </div>
     </header>
 
     <!-- Content -->
