@@ -27,7 +27,6 @@
         /* ── Design tokens — light theme ────────────────────────────────── */
         :root {
             --gl-sidebar-w: 220px;
-            --gl-topbar-h: 52px;
 
             /* Matches main GlidePlan app --background / --surface / --border */
             --gl-bg:       #f8fafc;
@@ -47,9 +46,6 @@
             --gl-sidebar-text:  #94a3b8;
             --gl-sidebar-hover: rgba(255,255,255,.07);
             --gl-sidebar-active:#2563eb;
-
-            --gl-topbar-bg:     #1e293b;
-            --gl-topbar-text:   #cbd5e1;
 
             /* Matches main app --shadow: very crisp, minimal */
             --gl-shadow: 0 1px 3px 0 rgba(0,0,0,.1);
@@ -214,57 +210,46 @@
             background: var(--gl-bg);
         }
 
-        /* ── Top bar ──────────────────────────────────────────────────────── */
+        /* ── Top bar — matches GlidePlan's modern-header card ────────────── */
         .gl-topbar {
-            height: var(--gl-topbar-h);
-            background: var(--gl-topbar-bg);
+            background: var(--gl-surface);
+            border-radius: 12px;
+            box-shadow: var(--gl-shadow);
             display: flex;
             align-items: center;
-            padding: 0 20px;
-            gap: 10px;
-            position: sticky;
-            top: 0;
-            z-index: 40;
+            padding: 10px 16px;
+            gap: 8px;
+            margin: 8px 12px 12px;
         }
         .gl-topbar-title {
             font-size: 0.9rem;
             font-weight: 600;
-            color: #e2e8f0;
+            color: var(--gl-text);
         }
         .gl-topbar-spacer { flex: 1; }
         .gl-topbar-user {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 0.82rem;
-            color: var(--gl-topbar-text);
+            font-size: 0.85rem;
+            color: var(--gl-muted);
         }
         .gl-topbar-app-btn {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            padding: 4px 10px;
-            border-radius: 6px;
-            background: rgba(255,255,255,.1);
-            color: #e2e8f0;
-            font-size: 0.8rem;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 8px;
+            background: var(--gl-primary);
+            color: #fff;
+            font-size: 0.85rem;
             font-weight: 600;
             text-decoration: none;
             line-height: 1;
-            transition: background .15s;
+            transition: background .15s, opacity .15s;
         }
-        .gl-topbar-app-btn:hover { background: rgba(255,255,255,.18); color: #fff; }
-
-        /* Shoelace overrides for dark topbar context */
-        .gl-topbar sl-select {
-            --sl-input-background-color: rgba(255,255,255,.05);
-            --sl-input-border-color: rgba(255,255,255,.12);
-            --sl-input-color: #cbd5e1;
-            --sl-input-font-size-small: 0.8rem;
-        }
-        .gl-topbar sl-icon-button::part(base) { color: var(--gl-topbar-text); }
-        .gl-topbar sl-icon-button::part(base):hover { color: #fff; background: rgba(255,255,255,.08); border-radius: 6px; }
-        .gl-topbar sl-divider { height: 20px; --color: rgba(255,255,255,.15); }
+        .gl-topbar-app-btn:hover { background: var(--gl-primary-h); color: #fff; }
+        .gl-topbar sl-divider { height: 20px; }
 
         /* ── Content ──────────────────────────────────────────────────────── */
         .gl-content {
@@ -565,27 +550,33 @@
 <div class="gl-main">
 
 
-    <!-- Top bar -->
+    <!-- Top bar — mirrors GlidePlan's modern-header layout -->
     <header class="gl-topbar">
+        <!-- Mobile hamburger -->
         <button class="gl-nav-toggle" id="navToggle" aria-label="Open menu" data-i18n-title="logbook.nav.open_menu">
             <i class="fas fa-bars"></i>
         </button>
+
+        <!-- Page title -->
         <span class="gl-topbar-title">{% block page_title %}GlideLog{% endblock %}</span>
-        <div class="gl-topbar-spacer"></div>
 
-        <!-- User info -->
-        <div class="gl-topbar-user">
-            <sl-badge variant="{% if current_user.tier == 'admin' %}success{% elif current_user.tier == 'premium' %}primary{% else %}neutral{% endif %}" pill>{{ current_user.tier.upper() }}</sl-badge>
-            <span>{{ current_user.display_name }}</span>
-        </div>
-
-        <!-- GlidePlan app switch -->
+        <!-- GlidePlan app switch (left of spacer, like GlideLog btn in GlidePlan) -->
         <a href="/" class="gl-topbar-app-btn" title="Back to GlidePlan">
             <img src="/static/images/logo.png" alt="" style="width:16px;height:16px;border-radius:3px;"> GlidePlan
         </a>
 
+        <div class="gl-topbar-spacer"></div>
+
+        <!-- User info: tier badge + name + logout -->
+        <div class="gl-topbar-user">
+            <sl-badge variant="{% if current_user.tier == 'admin' %}success{% elif current_user.tier == 'premium' %}primary{% else %}neutral{% endif %}" pill>{{ current_user.tier.upper() }}</sl-badge>
+            <span>{{ current_user.display_name }}</span>
+            <sl-icon-button name="box-arrow-right" href="/auth/logout" data-i18n-title="logbook.nav.logout" label="Log out"></sl-icon-button>
+        </div>
+
         <sl-divider vertical></sl-divider>
 
+        <!-- Language selector -->
         <sl-select id="lang-selector" size="small" style="width:140px;" title="Language">
             <sl-option value="en">🇬🇧 English</sl-option>
             <sl-option value="pl">🇵🇱 Polski</sl-option>
