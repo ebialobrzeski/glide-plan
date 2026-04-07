@@ -5,7 +5,7 @@ import calendar
 from datetime import date, timedelta
 from typing import Optional
 
-from sqlalchemy import extract, func, literal_column
+from sqlalchemy import case, extract, func, literal_column
 from sqlalchemy.orm import Session
 
 from backend.models.flight import Flight
@@ -547,6 +547,32 @@ def last_flight_by_launch(db: Session, user: User,
     if launch_type:
         q = q.filter(Flight.launch_type.like(f'{launch_type}%'))
     return q.scalar()
+
+
+def last_flights_per_method(db: Session, user: User) -> dict:
+    """Return the most recent flight date for each launch method in ONE query.
+
+    Returns a dict with keys 'W', 'S', 'E', and 'any'.
+    Replaces up to 4 individual last_flight_by_launch() calls.
+    """
+    method_col = case(
+        (Flight.launch_type.like('W%'), 'W'),
+        (Flight.launch_type.like('S%'), 'S'),
+        (Flight.launch_type.like('E%'), 'E'),
+        else_='other',
+    ).label('method')
+
+    rows = (
+        db.query(method_col, func.max(Flight.date).label('last_date'))
+        .filter(Flight.user_id == user.id, Flight.launch_type.isnot(None))
+        .group_by(method_col)
+        .all()
+    )
+
+    result = {r.method: r.last_date for r in rows}
+    all_dates = [d for d in result.values() if d]
+    result['any'] = max(all_dates) if all_dates else None
+    return result
 
 
 def flights_in_window(db: Session, user: User,

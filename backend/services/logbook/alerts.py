@@ -53,19 +53,29 @@ def _alert(level: str, code: str, title: str, description: str = '',
 # Public API
 # ---------------------------------------------------------------------------
 
-def get_alerts(db: Session, user: User) -> list[dict]:
-    """Return a list of all active alerts for the given user."""
+def get_alerts(db: Session, user: User,
+               _window_730: Optional[dict] = None,
+               _last_per_method: Optional[dict] = None) -> list[dict]:
+    """Return a list of all active alerts for the given user.
+
+    Pass pre-computed _window_730 / _last_per_method to avoid duplicate DB
+    queries when called alongside get_currency_summary() on the same request.
+    """
     alerts: list[dict] = []
     today = date.today()
 
     # Resolve pilot profile (may be None if user has not filled it in)
     profile = getattr(user, 'pilot_profile', None)
 
+    # Shared data — compute once, reuse across checkers
+    window_730     = _window_730     or stats_svc.flights_in_window(db, user, window_days=730)
+    last_per_method = _last_per_method or stats_svc.last_flights_per_method(db, user)
+
     # ── SFCL.160(a) — Biennial currency ─────────────────────────────────────
-    alerts.extend(_check_biennial_currency(db, user, today))
+    alerts.extend(_check_biennial_currency(db, user, today, window=window_730))
 
     # ── SFCL.130 — Launch method recency ────────────────────────────────────
-    alerts.extend(_check_launch_recency(db, user, today))
+    alerts.extend(_check_launch_recency(today, last_per_method))
 
     # ── FCL.060 — Recent experience for passenger carriage ──────────────────
     alerts.extend(_check_passenger_recency(db, user, today))
@@ -82,18 +92,25 @@ def get_alerts(db: Session, user: User) -> list[dict]:
     return alerts
 
 
-def get_currency_summary(db: Session, user: User) -> dict:
-    """Return a structured currency summary for the licenses page."""
+def get_currency_summary(db: Session, user: User,
+                         _window_730: Optional[dict] = None,
+                         _last_per_method: Optional[dict] = None) -> dict:
+    """Return a structured currency summary for the licenses page.
+
+    Pass pre-computed _window_730 / _last_per_method to avoid duplicate DB
+    queries when called alongside get_alerts() on the same request.
+    """
     today = date.today()
     profile = getattr(user, 'pilot_profile', None)
-    window = stats_svc.flights_in_window(db, user, window_days=730)
-    window_tmg = stats_svc.flights_in_window(db, user, window_days=730, launch_type='E')
+    window      = _window_730      or stats_svc.flights_in_window(db, user, window_days=730)
+    last_pm     = _last_per_method or stats_svc.last_flights_per_method(db, user)
+    window_tmg  = stats_svc.flights_in_window(db, user, window_days=730, launch_type='E')
 
-    # Last flight by method
-    last_w   = stats_svc.last_flight_by_launch(db, user, 'W')
-    last_s   = stats_svc.last_flight_by_launch(db, user, 'S')
-    last_tmg = stats_svc.last_flight_by_launch(db, user, 'E')
-    last_any = stats_svc.last_flight_by_launch(db, user)
+    # Last flight by method — from the single pre-computed dict
+    last_w   = last_pm.get('W')
+    last_s   = last_pm.get('S')
+    last_tmg = last_pm.get('E')
+    last_any = last_pm.get('any')
 
     # SFCL.160(a) requirements
     min_hours_min = 5 * 60   # 5 hours in minutes
@@ -144,10 +161,12 @@ def get_currency_summary(db: Session, user: User) -> dict:
 # Internal checkers
 # ---------------------------------------------------------------------------
 
-def _check_biennial_currency(db: Session, user: User, today: date) -> list[dict]:
+def _check_biennial_currency(db: Session, user: User, today: date,
+                             window: Optional[dict] = None) -> list[dict]:
     """SFCL.160(a) — 5h + 15 launches in the last 24 months."""
     alerts: list[dict] = []
-    window = stats_svc.flights_in_window(db, user, window_days=730)
+    if window is None:
+        window = stats_svc.flights_in_window(db, user, window_days=730)
 
     hours_min   = window['minutes']
     launches    = window['flights']
@@ -180,8 +199,12 @@ def _check_biennial_currency(db: Session, user: User, today: date) -> list[dict]
     return alerts
 
 
-def _check_launch_recency(db: Session, user: User, today: date) -> list[dict]:
-    """SFCL.130 — alert if a launch method hasn't been used in >90 days."""
+def _check_launch_recency(today: date, last_per_method: dict) -> list[dict]:
+    """SFCL.130 — alert if a launch method hasn't been used in >90 days.
+
+    Uses a pre-computed last_per_method dict (from last_flights_per_method())
+    so no additional DB queries are needed.
+    """
     alerts: list[dict] = []
 
     methods = [
@@ -191,7 +214,7 @@ def _check_launch_recency(db: Session, user: User, today: date) -> list[dict]:
     ]
 
     for code, label, prefix in methods:
-        last = stats_svc.last_flight_by_launch(db, user, code)
+        last = last_per_method.get(code)
         if last is None:
             continue   # never used — no alert (may not be in exam methods)
         days = (today - last).days
