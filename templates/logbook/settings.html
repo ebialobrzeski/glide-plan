@@ -67,10 +67,32 @@ async function triggerAllSync() {
     setTimeout(loadSyncStatus, 2000);
 }
 
-async function saveProfile() {
-    showToast(window.i18n ? window.i18n.t('logbook.settings.sync_started', 'Coming soon') : 'Coming soon');
+async function loadProfile() {
+    const resp = await fetch('/logbook/api/profile');
+    if (!resp.ok) return;
+    const d = await resp.json();
+    if (d.medical_expiry) document.getElementById('medicalExpiry').value = d.medical_expiry;
+    if (d.license_date)   document.getElementById('licenseDate').value   = d.license_date;
 }
 
-document.addEventListener('DOMContentLoaded', loadSyncStatus);
+async function saveProfile() {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k, fb) => fb || k;
+    const payload = {
+        medical_expiry: document.getElementById('medicalExpiry').value || null,
+        license_date:   document.getElementById('licenseDate').value   || null,
+    };
+    const resp = await fetch('/logbook/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (resp.ok) {
+        showToast(t('logbook.settings.profile_saved', 'Profile saved'));
+    } else {
+        showToast(t('logbook.settings.profile_save_error', 'Failed to save profile'), 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => { loadSyncStatus(); loadProfile(); });
 </script>
 {% endblock %}
