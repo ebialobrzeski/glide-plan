@@ -22,7 +22,7 @@ import requests
 import time as _time
 
 # backend.config loads dotenv from .env at import time
-from backend.config import STYLE_OPTIONS, SECRET_KEY
+from backend.config import STYLE_OPTIONS, SECRET_KEY, FLASK_DEBUG
 from backend.models.legacy import Waypoint
 from backend.file_io import (
     parse_cup_file, write_cup_file, parse_csv_file, write_csv_file, get_elevation,
@@ -1088,4 +1088,4 @@ def share_download(token):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=FLASK_DEBUG, host='0.0.0.0', port=5000)
