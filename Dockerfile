@@ -32,4 +32,7 @@ ENV FLASK_ENV=production
 # Expose port
 EXPOSE 5000
 
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python -c "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:5000/health', timeout=8).status == 200 else 1)"
+
 CMD ["/entrypoint.sh"]
