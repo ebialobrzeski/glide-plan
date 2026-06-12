@@ -269,14 +269,31 @@ def index():
 
 @app.route('/health')
 def health_check():
-    """Health check endpoint for monitoring."""
+    """Health check endpoint for monitoring.
+
+    Returns 200 when the app and its database are healthy, or 503 when the
+    database is configured but unreachable (a critical dependency). External
+    API reachability is reported for diagnostics but does not affect the
+    overall status, since it's a non-critical, best-effort integration.
+    """
     import requests
-    
+    from backend.db import is_db_available, get_engine
+
     health_status = {
         'status': 'healthy',
         'timestamp': datetime.now().isoformat()
     }
-    
+
+    # Database connectivity
+    if get_engine() is None:
+        health_status['database'] = 'not configured'
+    elif is_db_available():
+        health_status['database'] = 'reachable'
+    else:
+        health_status['database'] = 'unreachable'
+        health_status['status'] = 'unhealthy'
+        app.logger.error('Database unreachable during health check')
+
     # Test external API connectivity
     try:
         response = requests.get('https://api.opentopodata.org/v1/srtm30m?locations=52.0,21.0', timeout=5)
@@ -291,8 +308,9 @@ def health_check():
     except Exception as e:
         health_status['elevation_api'] = f'unexpected error: {str(e)}'
         app.logger.error(f'Unexpected error during health check: {e}')
-    
-    return jsonify(health_status), 200
+
+    status_code = 200 if health_status['status'] == 'healthy' else 503
+    return jsonify(health_status), status_code
 
 
 
