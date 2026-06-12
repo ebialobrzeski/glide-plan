@@ -42,9 +42,18 @@ from backend.routes.logbook import logbook_bp
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
-if app.secret_key in ('CHANGE-ME-IN-PRODUCTION', 'CHANGE-ME'):
-    import warnings
-    warnings.warn('SECRET_KEY is not set. Set SECRET_KEY environment variable in production.', stacklevel=1)
+
+INSECURE_SECRET_KEYS = {'CHANGE-ME-IN-PRODUCTION', 'CHANGE-ME', 'change_this_secret_key_in_production'}
+if app.secret_key in INSECURE_SECRET_KEYS:
+    if FLASK_DEBUG:
+        import warnings
+        warnings.warn('SECRET_KEY is not set. Set SECRET_KEY environment variable in production.', stacklevel=1)
+    else:
+        raise RuntimeError(
+            'SECRET_KEY is not set to a secure value. Refusing to start outside debug mode. '
+            'Set the SECRET_KEY environment variable to a random secret, e.g.: '
+            'python3 -c "import secrets; print(secrets.token_hex(32))"'
+        )
 
 CORS(app)
 
