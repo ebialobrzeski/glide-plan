@@ -19,7 +19,7 @@ from flask_cors import CORS
 from flask_login import LoginManager
 from werkzeug.utils import secure_filename
 import requests
-import time as _time
+import time as _time  # noqa: F401
 
 # backend.config loads dotenv from .env at import time
 from backend.config import STYLE_OPTIONS, SECRET_KEY, FLASK_DEBUG
