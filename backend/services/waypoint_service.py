@@ -113,7 +113,7 @@ def update_file(
     Optionally rename or update description if provided.
     """
     wf = get_file(db, user, file_id)
-    if wf is None:
+    if wf is None or wf.owner_id != user.id:
         raise WaypointServiceError('Waypoint file not found.')
 
     if name is not None:
@@ -144,7 +144,7 @@ def update_file(
 def delete_file(db: Session, user: User, file_id: str) -> bool:
     """Delete a waypoint file owned by *user*. Returns True if deleted, False if not found."""
     wf = get_file(db, user, file_id)
-    if wf is None:
+    if wf is None or wf.owner_id != user.id:
         return False
     db.delete(wf)
     logger.info('Deleted waypoint file %s for user %s', file_id, user.id)
@@ -156,7 +156,7 @@ def set_visibility(db: Session, user: User, file_id: str, is_public: bool) -> Wa
     if not can_set_private(user):
         raise WaypointServiceError('Upgrade to premium to make files private.')
     wf = get_file(db, user, file_id)
-    if wf is None:
+    if wf is None or wf.owner_id != user.id:
         raise WaypointServiceError('Waypoint file not found.')
     wf.is_public = is_public
     logger.info('Set waypoint file %s visibility to %s for user %s', file_id, is_public, user.id)
