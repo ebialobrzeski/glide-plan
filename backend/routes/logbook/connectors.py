@@ -1,6 +1,8 @@
 """GlideLog — connectors API endpoints."""
 import logging
+import re
 import threading
+from urllib.parse import urlparse
 
 from flask import jsonify, request
 from flask_login import current_user
@@ -15,6 +17,18 @@ from backend.services.logbook.sync import sync_connector
 from backend.utils.auth_decorators import login_required
 
 logger = logging.getLogger(__name__)
+
+# EchronoConnector uses base_url (with the user's stored credentials) to build
+# outbound requests, so it must be restricted to the expected provider domain
+# to prevent SSRF against internal hosts (CWE-918).
+_ECHRONO_HOST_RE = re.compile(r'^([a-z0-9-]+\.)*echronometraz\.pl$')
+
+
+def _validate_base_url(base_url: str) -> None:
+    """Raise ValueError if base_url is not an https URL on echronometraz.pl."""
+    parsed = urlparse(base_url)
+    if parsed.scheme != 'https' or not _ECHRONO_HOST_RE.match((parsed.hostname or '').lower()):
+        raise ValueError('base_url must be an https URL on the echronometraz.pl domain.')
 
 
 @logbook_bp.route('/api/connectors', methods=['GET'])
@@ -35,6 +49,13 @@ def create_connector():
         return jsonify({'error': 'Invalid connector type.'}), 400
     if not data.get('display_name', '').strip():
         return jsonify({'error': 'display_name is required.'}), 400
+
+    base_url = data.get('base_url')
+    if base_url:
+        try:
+            _validate_base_url(base_url)
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
 
     try:
         connector = Connector(
@@ -66,6 +87,12 @@ def update_connector(connector_id):
         return jsonify({'error': 'Connector not found.'}), 404
 
     data = request.get_json(silent=True) or {}
+    if data.get('base_url'):
+        try:
+            _validate_base_url(data['base_url'])
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
+
     try:
         if 'display_name' in data:
             connector.display_name = data['display_name'].strip()
