@@ -28,10 +28,8 @@ class TaskPlanner {
         this.bearingEditIndex = -1; // Task point index being bearing-edited
         this._onBearingMove = null; // Bound mousemove handler ref
         this._onBearingClick = null; // Bound click handler ref
-        this.airspaces = [];        // Parsed airspace objects
-        this.airspaceLayer = null;  // L.layerGroup for airspace polygons
-        this.airspaceAltMin = 0;       // feet — altitude filter floor
-        this.airspaceAltFilter = 10000; // feet — altitude filter ceiling
+        this.airspaceLayer = null;  // L.layerGroup for airspace polygons (z-order anchor)
+        this.airspace = null;       // AirspaceOverlay instance (created in setup)
     }
 
     /** Called once when the Task tab is first shown */
@@ -59,6 +57,7 @@ class TaskPlanner {
         }).addTo(this.map);
 
         this.airspaceLayer = L.layerGroup().addTo(this.map);
+        if (this.airspace) this.airspace.setLayer(this.airspaceLayer);
         this.taskLayer = L.layerGroup().addTo(this.map);
         this.markerLayer = L.layerGroup().addTo(this.map);
 
@@ -206,50 +205,24 @@ class TaskPlanner {
 
         // Airspace — OpenAIP fetch (primary) + local file import (secondary)
         if (!window.VIEW_MODE) {
-            document.getElementById('airspace-openaip-btn').addEventListener('click', () => {
-                this.fetchOpenAipAirspace();
+            this.airspace = new AirspaceOverlay({
+                getMap: () => this.map,
+                isReady: () => this.initialized,
+                ids: {
+                    fetchBtn: 'airspace-openaip-btn',
+                    openBtn: 'airspace-open-btn',
+                    fileInput: 'airspace-file-input',
+                    clearBtn: 'airspace-clear-btn',
+                    filterPanel: 'airspace-filter-panel',
+                    fileName: 'airspace-file-name',
+                    count: 'airspace-count',
+                    altMin: 'airspace-alt-min-slider',
+                    altMax: 'airspace-alt-max-slider',
+                    altLabel: 'airspace-alt-label',
+                    altFill: 'airspace-alt-fill',
+                },
             });
-            document.getElementById('airspace-open-btn').addEventListener('click', () => {
-                document.getElementById('airspace-file-input').click();
-            });
-            document.getElementById('airspace-file-input').addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    this.loadAirspaceFile(e.target.files[0]);
-                    e.target.value = '';
-                }
-            });
-            document.getElementById('airspace-clear-btn').addEventListener('click', () => {
-                this.airspaces = [];
-                if (this.airspaceLayer) this.airspaceLayer.clearLayers();
-                // Remove mousemove handler and hide tooltip so it doesn't linger
-                if (this._airspaceMoveHandler) {
-                    this.map.off('mousemove', this._airspaceMoveHandler);
-                    this._airspaceMoveHandler = null;
-                }
-                if (this._airspaceTooltipEl) {
-                    this._airspaceTooltipEl.style.display = 'none';
-                }
-                document.getElementById('airspace-filter-panel').style.display = 'none';
-                document.getElementById('airspace-clear-btn').style.display = 'none';
-            });
-            const updateAltSliders = () => {
-                let minVal = parseInt(document.getElementById('airspace-alt-min-slider').value);
-                let maxVal = parseInt(document.getElementById('airspace-alt-max-slider').value);
-                if (minVal > maxVal) {
-                    // Swap so min never exceeds max
-                    document.getElementById('airspace-alt-min-slider').value = maxVal;
-                    document.getElementById('airspace-alt-max-slider').value = minVal;
-                    [minVal, maxVal] = [maxVal, minVal];
-                }
-                this.airspaceAltMin = minVal;
-                this.airspaceAltFilter = maxVal;
-                document.getElementById('airspace-alt-label').textContent =
-                    this.formatAlt(minVal) + '\u2013' + this.formatAlt(maxVal);
-                this._updateAltFill();
-                this.renderAirspaces();
-            };
-            document.getElementById('airspace-alt-min-slider').addEventListener('input', updateAltSliders);
-            document.getElementById('airspace-alt-max-slider').addEventListener('input', updateAltSliders);
+            this.airspace.bindEvents();
 
             // Wind arrow live update
             ['task-wind-dir', 'task-wind-speed', 'task-tas'].forEach(id => {
@@ -1427,263 +1400,6 @@ class TaskPlanner {
         } catch (e) {
             // Ignore load errors silently
         }
-    }
-
-    // ──────────── Airspace ────────────
-
-    /** Fetch airspace zones from OpenAIP for the current map view */
-    async fetchOpenAipAirspace() {
-        if (!this.map) return;
-        const bounds = this.map.getBounds();
-        const params = new URLSearchParams({
-            south: bounds.getSouth().toFixed(4),
-            west:  bounds.getWest().toFixed(4),
-            north: bounds.getNorth().toFixed(4),
-            east:  bounds.getEast().toFixed(4),
-        });
-
-        const btn = document.getElementById('airspace-openaip-btn');
-        if (btn) { btn.loading = true; btn.disabled = true; }
-
-        try {
-            const resp = await fetch('/api/airspace/openaip?' + params);
-            if (!resp.ok) {
-                const err = await resp.json().catch(() => ({}));
-                throw new Error(err.error || resp.statusText);
-            }
-            const zones = await resp.json();
-            this.airspaces = zones;
-            document.getElementById('airspace-file-name').textContent = 'OpenAIP';
-            document.getElementById('airspace-count').textContent = zones.length + ' zones';
-            document.getElementById('airspace-filter-panel').style.display = '';
-            document.getElementById('airspace-clear-btn').style.display = '';
-            this._updateAltFill();
-            this.renderAirspaces();
-        } catch (err) {
-            alert('Failed to fetch OpenAIP airspace: ' + err.message);
-        } finally {
-            if (btn) { btn.loading = false; btn.disabled = false; }
-        }
-    }
-
-    loadAirspaceFile(file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                this.airspaces = this.parseOpenAir(e.target.result);
-                document.getElementById('airspace-file-name').textContent = file.name;
-                document.getElementById('airspace-count').textContent = this.airspaces.length + ' zones';
-                document.getElementById('airspace-filter-panel').style.display = '';
-                document.getElementById('airspace-clear-btn').style.display = '';
-                this._updateAltFill();
-                this.renderAirspaces();
-            } catch (err) {
-                alert('Failed to parse airspace file: ' + err.message);
-            }
-        };
-        reader.readAsText(file, 'UTF-8');
-    }
-
-    parseDMSPoint(str) {
-        const m = str.match(/(\d+):(\d+):(\d+(?:\.\d+)?)\s*([NS])\s+(\d+):(\d+):(\d+(?:\.\d+)?)\s*([EW])/);
-        if (!m) return null;
-        const lat = (parseInt(m[1]) + parseInt(m[2]) / 60 + parseFloat(m[3]) / 3600) * (m[4] === 'S' ? -1 : 1);
-        const lon = (parseInt(m[5]) + parseInt(m[6]) / 60 + parseFloat(m[7]) / 3600) * (m[8] === 'W' ? -1 : 1);
-        return [lat, lon];
-    }
-
-    parseAltFt(str) {
-        const s = str.trim().toUpperCase();
-        if (s === 'GND' || s === 'SFC' || s === 'AGL' || s === 'MSL') return 0;
-        const fl = s.match(/^FL\s*(\d+)/);
-        if (fl) return parseInt(fl[1]) * 100;
-        const ft = s.match(/^(\d+(?:\.\d+)?)\s*FT/);
-        if (ft) return Math.round(parseFloat(ft[1]));
-        const mt = s.match(/^(\d+(?:\.\d+)?)\s*M(?:\s|$)/);
-        if (mt) return Math.round(parseFloat(mt[1]) * 3.281);
-        return 0;
-    }
-
-    formatAlt(ft) {
-        if (ft === 0) return 'GND';
-        if (ft >= 1000 && ft % 100 === 0) return 'FL' + String(ft / 100).padStart(3, '0');
-        return ft.toLocaleString() + ' ft';
-    }
-
-    parseOpenAir(text) {
-        const airspaces = [];
-        let cur = null;
-        let cx = null;
-
-        for (let raw of text.split('\n')) {
-            const line = raw.trim();
-            if (!line || line.startsWith('*')) continue;
-
-            if (line.startsWith('AC ')) {
-                if (cur) airspaces.push(cur);
-                cur = { cls: line.slice(3).trim(), name: '', altLower: 0, altUpper: 99999, time: null, points: [], circles: [] };
-                cx = null;
-            } else if (!cur) {
-                continue;
-            } else if (line.startsWith('AN ')) {
-                cur.name = line.slice(3).trim();
-            } else if (line.startsWith('AL ')) {
-                cur.altLower = this.parseAltFt(line.slice(3));
-            } else if (line.startsWith('AH ')) {
-                cur.altUpper = this.parseAltFt(line.slice(3));
-            } else if (line.startsWith('AT ')) {
-                cur.time = line.slice(3).trim();
-            } else if (line.includes('X=')) {
-                cx = this.parseDMSPoint(line.slice(line.indexOf('X=') + 2));
-            } else if (line.startsWith('DP ')) {
-                const ll = this.parseDMSPoint(line.slice(3));
-                if (ll) cur.points.push(ll);
-            } else if (line.startsWith('DC ')) {
-                const r = parseFloat(line.slice(3));
-                if (cx && !isNaN(r)) cur.circles.push({ center: cx, radius: r * 1852 });
-            }
-        }
-        if (cur) airspaces.push(cur);
-        return airspaces;
-    }
-
-    getAirspaceStyle(cls) {
-        const c = (cls || '').trim().toUpperCase();
-        if (c === 'R')                         return { color: '#dc2626', fillOpacity: 0.12 };
-        if (c === 'P')                         return { color: '#7f1d1d', fillOpacity: 0.18 };
-        if (c === 'D')                         return { color: '#ea580c', fillOpacity: 0.12 };
-        if (c === 'CTR')                       return { color: '#7c3aed', fillOpacity: 0.10 };
-        if (c.includes('RMZ'))                 return { color: '#0891b2', fillOpacity: 0.08 };
-        if (c.includes('TMZ'))                 return { color: '#6b7280', fillOpacity: 0.06 };
-        if (c === 'W')                         return { color: '#16a34a', fillOpacity: 0.06 };
-        if (c === 'C' || c === 'B')            return { color: '#2563eb', fillOpacity: 0.10 };
-        if (c === 'A')                         return { color: '#1e3a8a', fillOpacity: 0.14 };
-        if (c === 'E')                         return { color: '#3b82f6', fillOpacity: 0.06 };
-        if (c.includes('FIR'))                 return { color: '#94a3b8', fillOpacity: 0.03 };
-        return                                        { color: '#64748b', fillOpacity: 0.05 };
-    }
-
-    _updateAltFill() {
-        const fill = document.getElementById('airspace-alt-fill');
-        if (!fill) return;
-        const sliderMin = 0, sliderMax = 25000;
-        const lo = (this.airspaceAltMin - sliderMin) / (sliderMax - sliderMin) * 100;
-        const hi = (this.airspaceAltFilter - sliderMin) / (sliderMax - sliderMin) * 100;
-        fill.style.left = lo + '%';
-        fill.style.width = (hi - lo) + '%';
-    }
-
-    renderAirspaces() {
-        if (!this.initialized || !this.airspaceLayer) return;
-        this.airspaceLayer.clearLayers();
-        if (this._airspaceMoveHandler) {
-            this.map.off('mousemove', this._airspaceMoveHandler);
-            this._airspaceMoveHandler = null;
-        }
-        const minAlt = this.airspaceAltMin;
-        const maxAlt = this.airspaceAltFilter;
-
-        // Create shared floating tooltip element (once)
-        if (!this._airspaceTooltipEl) {
-            this._airspaceTooltipEl = document.createElement('div');
-            this._airspaceTooltipEl.className = 'airspace-multi-tooltip';
-            this._airspaceTooltipEl.style.display = 'none';
-            document.body.appendChild(this._airspaceTooltipEl);
-        }
-        const tooltipEl = this._airspaceTooltipEl;
-
-        // Build flat list of {layer, as, s} for hit-testing
-        const allLayers = [];
-
-        for (const as of this.airspaces) {
-            if (as.altUpper < minAlt || as.altLower > maxAlt) continue;
-            const s = this.getAirspaceStyle(as.cls);
-            const baseOpts = { color: s.color, weight: 1.5, opacity: 0.85, fillColor: s.color, fillOpacity: s.fillOpacity, interactive: false, bubblingMouseEvents: false };
-
-            if (as.points.length >= 3) {
-                const layer = L.polygon(as.points, { ...baseOpts }).addTo(this.airspaceLayer);
-                allLayers.push({ layer, as, s });
-            }
-            for (const c of as.circles) {
-                const layer = L.circle(c.center, { ...baseOpts, radius: c.radius }).addTo(this.airspaceLayer);
-                allLayers.push({ layer, as, s });
-            }
-        }
-
-        // Single map-level mousemove — hit-test every shape ourselves
-        const prevHit = new Set();
-
-        this._airspaceMoveHandler = (e) => {
-            const pt = e.layerPoint;
-            const nowHit = new Set();
-            const hitAirspaces = [];
-
-            for (const item of allLayers) {
-                let inside = false;
-                try { inside = item.layer._containsPoint(pt); } catch (_) {}
-                if (!inside && item.layer instanceof L.Circle) {
-                    inside = e.latlng.distanceTo(item.layer.getLatLng()) <= item.layer.getRadius();
-                }
-
-                if (inside) {
-                    const id = L.stamp(item.layer);
-                    nowHit.add(id);
-                    hitAirspaces.push(item);
-                    if (!prevHit.has(id)) {
-                        item.layer.setStyle({ weight: 2.5, fillOpacity: Math.min(item.s.fillOpacity * 2.5, 0.5) });
-                    }
-                }
-            }
-
-            // Un-highlight shapes we just left
-            for (const item of allLayers) {
-                const id = L.stamp(item.layer);
-                if (prevHit.has(id) && !nowHit.has(id)) {
-                    item.layer.setStyle({ weight: 1.5, fillOpacity: item.s.fillOpacity });
-                }
-            }
-            prevHit.clear();
-            nowHit.forEach(id => prevHit.add(id));
-
-            if (hitAirspaces.length === 0) {
-                tooltipEl.style.display = 'none';
-                return;
-            }
-
-            // Build tooltip content
-            const parts = hitAirspaces.map(({ as }) => {
-                let row = `<div class="astt-entry">`;
-                row += `<div class="astt-name">${this.escapeHtml(as.name || as.cls)}</div>`;
-                row += `<div class="astt-meta">Class&nbsp;<strong>${this.escapeHtml(as.cls)}</strong>`;
-                if (as.type) row += `&ensp;(${this.escapeHtml(as.type)})`;
-                row += `&emsp;${this.escapeHtml(this.formatAlt(as.altLower))}&thinsp;&ndash;&thinsp;${this.escapeHtml(this.formatAlt(as.altUpper))}</div>`;
-                const flags = [];
-                if (as.requires_transponder) flags.push('XPDR');
-                if (as.requires_flight_plan) flags.push('FPL');
-                if (flags.length) row += `<div class="astt-flags">${flags.join(' · ')}</div>`;
-                if (as.time) row += `<div class="astt-time"><i class="fas fa-clock"></i> ${this.escapeHtml(as.time)}</div>`;
-                row += `</div>`;
-                return row;
-            });
-            tooltipEl.innerHTML = parts.join('<hr class="astt-sep">');
-            tooltipEl.style.display = '';
-
-            const mx = e.originalEvent.clientX, my = e.originalEvent.clientY;
-            const pad = 14;
-            const tw = tooltipEl.offsetWidth || 220, th = tooltipEl.offsetHeight || 60;
-            tooltipEl.style.left = (mx + pad + tw > window.innerWidth  ? mx - tw - pad : mx + pad) + 'px';
-            tooltipEl.style.top  = (my + pad + th > window.innerHeight ? my - th - pad : my + pad) + 'px';
-        };
-
-        this.map.on('mousemove', this._airspaceMoveHandler);
-
-        this.map.getContainer().addEventListener('mouseleave', () => {
-            for (const item of allLayers) {
-                item.layer.setStyle({ weight: 1.5, fillOpacity: item.s.fillOpacity });
-            }
-            prevHit.clear();
-            tooltipEl.style.display = 'none';
-        });
     }
 
     // ──────────── Wind control ────────────

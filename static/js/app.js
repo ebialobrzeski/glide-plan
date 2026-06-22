@@ -203,6 +203,10 @@ class SoaringCupEditor {
             keepBuffer: 2                // Keep more tiles in memory for smoother panning
         }).addTo(this.map);
 
+        // Airspace layer — added before the marker cluster so airspace polygons
+        // render beneath waypoint markers.
+        this.airspaceLayer = L.layerGroup().addTo(this.map);
+
         // Initialize marker cluster group with custom options for performance
         this.markerClusterGroup = L.markerClusterGroup({
             maxClusterRadius: 30,
@@ -231,6 +235,29 @@ class SoaringCupEditor {
                 document.getElementById('add-waypoint-map-btn').innerHTML = '<i class="fas fa-map-pin" slot="prefix"></i> Add Waypoint on Map';
             }
         });
+
+        // Airspace fetch/render overlay for the Map View (same feature as the
+        // Task Planner). Reuses the shared AirspaceOverlay against this map.
+        if (!window.VIEW_MODE && window.AirspaceOverlay) {
+            this.airspace = new AirspaceOverlay({
+                getMap: () => this.map,
+                layer: this.airspaceLayer,
+                ids: {
+                    fetchBtn: 'map-airspace-openaip-btn',
+                    openBtn: 'map-airspace-open-btn',
+                    fileInput: 'map-airspace-file-input',
+                    clearBtn: 'map-airspace-clear-btn',
+                    filterPanel: 'map-airspace-filter-panel',
+                    fileName: 'map-airspace-file-name',
+                    count: 'map-airspace-count',
+                    altMin: 'map-airspace-alt-min-slider',
+                    altMax: 'map-airspace-alt-max-slider',
+                    altLabel: 'map-airspace-alt-label',
+                    altFill: 'map-airspace-alt-fill',
+                },
+            });
+            this.airspace.bindEvents();
+        }
     }
 
     async loadWaypoints() {

@@ -153,8 +153,37 @@
                                 <sl-button id="show-legend-btn" variant="default" size="small" title="Show waypoint icons legend" data-i18n-title="map.legend_title">
                                     <i class="fas fa-info-circle" slot="prefix"></i> <span data-i18n="map.legend">Legend</span>
                                 </sl-button>
-
+                                {% if not view_mode %}
+                                <sl-button id="map-airspace-openaip-btn" variant="default" size="small" title="Fetch airspace from OpenAIP for current map view">
+                                    <i class="fas fa-shield-alt" slot="prefix"></i> <span data-i18n="task.airspace">Airspace</span>
+                                </sl-button>
+                                <sl-button id="map-airspace-open-btn" variant="default" size="small" title="Load airspace from local file">
+                                    <i class="fas fa-file-upload" slot="prefix"></i>
+                                </sl-button>
+                                <input type="file" id="map-airspace-file-input" accept=".txt,.openair,.air" style="display:none">
+                                <sl-button id="map-airspace-clear-btn" size="small" style="display:none" title="Remove airspace">
+                                    <i class="fas fa-times"></i>
+                                </sl-button>
+                                {% endif %}
                             </div>
+                            {% if not view_mode %}
+                            <!-- Airspace filter (shown after airspace load) -->
+                            <div id="map-airspace-filter-panel" class="airspace-filter-panel" style="display:none">
+                                <div class="airspace-filename-row">
+                                    <span id="map-airspace-file-name" class="airspace-filename"></span>
+                                    <span id="map-airspace-count" class="airspace-count"></span>
+                                </div>
+                                <div class="airspace-slider-row">
+                                    <label>Alt:&nbsp;<strong id="map-airspace-alt-label">0–FL100</strong></label>
+                                    <div class="dual-range-wrap">
+                                        <div class="dual-range-track-bg"></div>
+                                        <div class="dual-range-fill" id="map-airspace-alt-fill"></div>
+                                        <input type="range" id="map-airspace-alt-min-slider" class="dual-range" min="0" max="25000" step="500" value="0">
+                                        <input type="range" id="map-airspace-alt-max-slider" class="dual-range" min="0" max="25000" step="500" value="10000">
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
                         </sl-card>
 
                         {% if not view_mode %}
@@ -169,8 +198,8 @@
                             <div id="wpgen-card-body">
                                 <!-- Area selector -->
                                 <div class="wpgen-area-row">
-                                    <sl-button id="wpgen-select-area-btn" variant="default" size="small" title="Draw a rectangle on the map to select an area" data-i18n-title="wpgen.select_area_title">
-                                        <i class="fas fa-vector-square" slot="prefix"></i> <span data-i18n="wpgen.select_area">Select Area</span>
+                                    <sl-button id="wpgen-select-area-btn" variant="default" size="small" title="Click points on the map to outline a custom area, double-click to finish" data-i18n-title="wpgen.select_area_title">
+                                        <i class="fas fa-draw-polygon" slot="prefix"></i> <span data-i18n="wpgen.select_area">Select Area</span>
                                     </sl-button>
                                     <div id="wpgen-area-info" class="wpgen-area-info" style="display:none">
                                         <span id="wpgen-area-text" class="wpgen-area-text"></span>
@@ -1671,6 +1700,7 @@
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
     <script src="{{ url_for('static', filename='js/icon-mapping.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/airspace-overlay.js') }}"></script>
     <script src="{{ url_for('static', filename='js/task-planner.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script src="{{ url_for('static', filename='js/auth.js') }}"></script>

@@ -4,8 +4,8 @@
  * Integrates with window.app (SoaringCupEditor) and the main Leaflet map.
  *
  * Flow:
- *  1. User clicks "Select Area" → map enters rectangle-draw mode.
- *  2. User drags to draw a bbox on the map.
+ *  1. User clicks "Select Area" → map enters polygon-draw mode.
+ *  2. User clicks to drop vertices, then double-clicks to close the polygon.
  *  3. UI shows the selected area + type checkboxes.
  *  4. User clicks "Generate" → POST /api/waypoint-gen/generate.
  *  5. Response is merged into window.app.waypoints and updateUI() is called.
@@ -16,13 +16,33 @@
     'use strict';
 
     // ── State ────────────────────────────────────────────────────────────────
-    let _selectionRect = null;   // L.Rectangle on the main map
-    let _startLatLng = null;
-    let _selectedBounds = null;  // L.LatLngBounds — the finalised bbox
+    let _polyLayer = null;       // L.Polygon (closed) or L.Polyline (in progress)
+    let _vertexMarkers = [];     // L.CircleMarker per dropped vertex
+    let _points = [];            // L.LatLng[] — vertices being placed
+    let _selectedPolygon = null; // L.LatLng[] — the finalised polygon
     let _selecting = false;
+    let _clickTimer = null;      // debounce so a double-click doesn't add vertices
+    let _mapHandlers = null;     // { click, dblclick } bound during selection
 
     // ── DOM helpers ───────────────────────────────────────────────────────────
     const $ = (id) => document.getElementById(id);
+
+    // Translate with a guaranteed fallback. window.i18n.t() returns the key
+    // itself when a translation is missing, so we can't rely on `?? fallback`;
+    // pass the fallback through i18n's own (key, fallback, params) signature and
+    // still cover the case where i18n hasn't loaded at all.
+    function _t(key, fallback, params) {
+        if (window.i18n && typeof window.i18n.t === 'function') {
+            return window.i18n.t(key, fallback, params);
+        }
+        let val = fallback;
+        if (params) {
+            Object.entries(params).forEach(([k, v]) => {
+                val = val.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+            });
+        }
+        return val;
+    }
 
     function _setStatus(msg, variant) {
         const el = $('wpgen-status');
@@ -35,7 +55,7 @@
     function _setGenerateEnabled() {
         const btn = $('wpgen-generate-btn');
         if (!btn) return;
-        const hasBounds = !!_selectedBounds;
+        const hasArea = !!_selectedPolygon;
         const hasType = [
             'wpgen-airports', 'wpgen-outlandings', 'wpgen-obstacles',
             'wpgen-navaids', 'wpgen-hotspots', 'wpgen-hang-glidings', 'wpgen-reporting-points',
@@ -44,7 +64,7 @@
             const el = $(id);
             return el && el.checked;
         });
-        btn.disabled = !(hasBounds && hasType);
+        btn.disabled = !(hasArea && hasType);
     }
 
     // ── Map area selection ────────────────────────────────────────────────────
@@ -52,12 +72,8 @@
         return window.app && window.app.map;
     }
 
-    function _formatBounds(bounds) {
-        const fmt = (v) => v.toFixed(3);
-        return (
-            `${fmt(bounds.getSouth())}°N / ${fmt(bounds.getWest())}°E  →  ` +
-            `${fmt(bounds.getNorth())}°N / ${fmt(bounds.getEast())}°E`
-        );
+    function _formatPolygon(points) {
+        return _t('wpgen.area_points', '{n}-point area', { n: points.length });
     }
 
     function _updateAreaUI() {
@@ -65,25 +81,77 @@
         const areaText = $('wpgen-area-text');
         const selectBtn = $('wpgen-select-area-btn');
 
-        if (_selectedBounds) {
+        if (_selecting) {
+            // While drawing, the button doubles as a "Finish" action.
+            if (areaInfo) areaInfo.style.display = 'none';
+            if (selectBtn) selectBtn.innerHTML = `<i class="fas fa-check" slot="prefix"></i> ${_t('wpgen.finish_area', 'Finish')}`;
+        } else if (_selectedPolygon) {
             if (areaInfo) areaInfo.style.display = 'flex';
-            if (areaText) areaText.textContent = _formatBounds(_selectedBounds);
-            if (selectBtn) selectBtn.textContent = window.i18n?.t('wpgen.change_area') ?? 'Change Area';
+            if (areaText) areaText.textContent = _formatPolygon(_selectedPolygon);
+            if (selectBtn) selectBtn.textContent = _t('wpgen.change_area', 'Change Area');
         } else {
             if (areaInfo) areaInfo.style.display = 'none';
-            if (selectBtn) selectBtn.innerHTML = `<i class="fas fa-vector-square" slot="prefix"></i> ${window.i18n?.t('wpgen.select_area') ?? 'Select Area'}`;
+            if (selectBtn) selectBtn.innerHTML = `<i class="fas fa-draw-polygon" slot="prefix"></i> ${_t('wpgen.select_area', 'Select Area')}`;
         }
         _setGenerateEnabled();
     }
 
-    function _clearSelection() {
+    // Remove all drawing layers (polygon + vertex markers) from the map.
+    function _removeLayers() {
         const map = _getMap();
-        if (_selectionRect && map) {
-            map.removeLayer(_selectionRect);
-            _selectionRect = null;
+        if (!map) return;
+        if (_polyLayer) { map.removeLayer(_polyLayer); _polyLayer = null; }
+        _vertexMarkers.forEach((m) => map.removeLayer(m));
+        _vertexMarkers = [];
+    }
+
+    // Redraw the in-progress shape: a polyline for < 3 points, a polygon after.
+    function _redrawDraft() {
+        const map = _getMap();
+        if (!map) return;
+        const latlngs = _points.slice();
+        if (_polyLayer) { map.removeLayer(_polyLayer); _polyLayer = null; }
+        if (latlngs.length >= 2) {
+            const opts = { interactive: false, color: '#2563eb', weight: 2, dashArray: '4 4', fillOpacity: 0.15 };
+            _polyLayer = (latlngs.length >= 3 ? L.polygon(latlngs, opts) : L.polyline(latlngs, opts)).addTo(map);
         }
-        _selectedBounds = null;
-        _startLatLng = null;
+    }
+
+    function _addVertex(latlng) {
+        const map = _getMap();
+        if (!map) return;
+        _points.push(latlng);
+        const marker = L.circleMarker(latlng, {
+            radius: 4, color: '#2563eb', weight: 2, fillColor: '#fff', fillOpacity: 1, interactive: false,
+        }).addTo(map);
+        _vertexMarkers.push(marker);
+        _redrawDraft();
+        const ready = _points.length >= 3;
+        const hint = ready
+            ? _t('wpgen.select_hint_ready', 'Click to add more points, or click Finish / double-click to close ({n} so far).', { n: _points.length })
+            : _t('wpgen.select_hint', 'Click to add points ({n} so far). At least 3 needed.', { n: _points.length });
+        _setStatus(`<i class="fas fa-draw-polygon"></i> ${hint}`, 'info');
+    }
+
+    function _exitSelectionMode() {
+        const map = _getMap();
+        _selecting = false;
+        if (_clickTimer) { clearTimeout(_clickTimer); _clickTimer = null; }
+        if (map && _mapHandlers) {
+            map.off('click', _mapHandlers.click);
+            map.off('dblclick', _mapHandlers.dblclick);
+            map.getContainer().style.cursor = '';
+            map.getContainer().classList.remove('wpgen-selecting');
+            map.doubleClickZoom.enable();
+        }
+        _mapHandlers = null;
+    }
+
+    function _clearSelection() {
+        _exitSelectionMode();
+        _removeLayers();
+        _points = [];
+        _selectedPolygon = null;
         _updateAreaUI();
         _setStatus('', '');
     }
@@ -92,63 +160,79 @@
         const map = _getMap();
         if (!map || _selecting) return;
 
+        // Reset any previous drawing/selection before starting fresh.
+        _removeLayers();
+        _points = [];
+        _selectedPolygon = null;
+
         _selecting = true;
         map.getContainer().style.cursor = 'crosshair';
         map.getContainer().classList.add('wpgen-selecting');
-        // Disable dragging so mousedown/mousemove work cleanly
-        map.dragging.disable();
+        map.doubleClickZoom.disable();
+        _updateAreaUI();  // switch the button to "Finish"
 
-        // Remove previous rect if any
-        if (_selectionRect) { map.removeLayer(_selectionRect); _selectionRect = null; }
+        // A double-click fires two `click` events before `dblclick`; debounce the
+        // clicks so the closing double-click doesn't drop two stray vertices.
+        const onClick = (e) => {
+            if (_clickTimer) { clearTimeout(_clickTimer); _clickTimer = null; }
+            const latlng = e.latlng;
+            _clickTimer = setTimeout(() => {
+                _clickTimer = null;
+                _addVertex(latlng);
+            }, 250);
+        };
+        const onDblClick = () => {
+            if (_clickTimer) { clearTimeout(_clickTimer); _clickTimer = null; }
+            _finishSelection();
+        };
 
-        // Touch / mouse unified events via Leaflet
-        map.once('mousedown', function onDown(e) {
-            _startLatLng = e.latlng;
-            _selectionRect = L.rectangle(
-                [e.latlng, e.latlng],
-                { interactive: false, color: '#2563eb', weight: 2, fillOpacity: 0.15 }
-            ).addTo(map);
+        _mapHandlers = { click: onClick, dblclick: onDblClick };
+        map.on('click', onClick);
+        map.on('dblclick', onDblClick);
 
-            function onMove(ev) {
-                _selectionRect && _selectionRect.setBounds([_startLatLng, ev.latlng]);
-            }
-            function onUp(ev) {
-                map.off('mousemove', onMove);
-                map.off('mouseup', onUp);
-                _finishSelection(ev.latlng);
-            }
-            map.on('mousemove', onMove);
-            map.on('mouseup', onUp);
-        });
+        const hint = _t('wpgen.select_start', 'Click on the map to add area points (min 3), then click Finish or double-click.');
+        _setStatus(`<i class="fas fa-draw-polygon"></i> ${hint}`, 'info');
     }
 
-    function _finishSelection(endLatLng) {
+    // Button dispatcher: starts a new selection, or finishes the one in progress.
+    function _toggleAreaSelection() {
+        if (_selecting) {
+            _finishSelection();
+        } else {
+            _startAreaSelection();
+        }
+    }
+
+    function _finishSelection() {
+        if (_points.length < 3) {
+            const msg = _t('wpgen.need_three', 'An area needs at least 3 points.');
+            _exitSelectionMode();
+            _removeLayers();
+            _points = [];
+            _selectedPolygon = null;
+            _updateAreaUI();
+            _setStatus(`<i class="fas fa-exclamation-circle"></i> ${msg}`, 'error');
+            return;
+        }
+
+        _selectedPolygon = _points.slice();
+        _exitSelectionMode();
+        // Replace the dashed draft with a solid finalised polygon.
+        _removeLayers();
         const map = _getMap();
-        _selecting = false;
-        map.dragging.enable();
-        map.getContainer().style.cursor = '';
-        map.getContainer().classList.remove('wpgen-selecting');
-
-        if (!_startLatLng || !endLatLng) {
-            _clearSelection();
-            return;
+        if (map) {
+            _polyLayer = L.polygon(_selectedPolygon, {
+                interactive: false, color: '#2563eb', weight: 2, fillOpacity: 0.15,
+            }).addTo(map);
         }
-
-        const bounds = L.latLngBounds(_startLatLng, endLatLng);
-        if (bounds.getNorth() === bounds.getSouth() || bounds.getEast() === bounds.getWest()) {
-            _clearSelection();
-            return;
-        }
-        _selectedBounds = bounds;
-        if (_selectionRect) _selectionRect.setBounds(bounds);
-        _startLatLng = null;
+        _points = [];
         _updateAreaUI();
         _setStatus('', '');
     }
 
     // ── Generate ──────────────────────────────────────────────────────────────
     async function _generate() {
-        if (!_selectedBounds) { _setStatus('Select an area on the map first.', 'error'); return; }
+        if (!_selectedPolygon) { _setStatus('Select an area on the map first.', 'error'); return; }
 
         const types = [];
         const typeMap = {
@@ -174,12 +258,7 @@
         _setStatus('<i class="fas fa-spinner fa-spin"></i> Generating waypoints…', 'info');
 
         const body = {
-            bbox: {
-                min_lat: _selectedBounds.getSouth(),
-                max_lat: _selectedBounds.getNorth(),
-                min_lon: _selectedBounds.getWest(),
-                max_lon: _selectedBounds.getEast(),
-            },
+            polygon: _selectedPolygon.map((p) => [p.lat, p.lng]),
             types,
         };
 
@@ -253,7 +332,7 @@
         // Select Area button
         const selectBtn = $('wpgen-select-area-btn');
         if (selectBtn) {
-            selectBtn.addEventListener('click', _startAreaSelection);
+            selectBtn.addEventListener('click', _toggleAreaSelection);
         }
 
         // Clear area button

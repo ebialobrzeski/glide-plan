@@ -7,6 +7,7 @@ import csv
 import io
 import logging
 import requests
+from .http_retry import request_with_retry
 from .models import Waypoint
 
 logger = logging.getLogger(__name__)
@@ -346,7 +347,10 @@ def get_elevation(latitude, longitude):
 
     try:
         url = f"https://api.opentopodata.org/v1/srtm30m?locations={latitude},{longitude}"
-        response = requests.get(url, timeout=3)
+        # Conservative retry budget: this is an interactive single-point lookup,
+        # so keep it snappy (one quick retry, short cap) rather than blocking the
+        # request. On exhaustion the broad except below falls back to 0.
+        response = request_with_retry('GET', url, timeout=3, max_retries=1, max_wait_s=2.0)
         response.raise_for_status()
         data = response.json()
         results = data.get('results') or []

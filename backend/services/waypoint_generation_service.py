@@ -24,6 +24,8 @@ from sqlalchemy.orm import Session
 
 from backend.models.legacy import Waypoint
 from backend import config
+from backend.http_retry import RETRY_STATUSES, request_with_retry
+from backend.task_planner.airspace import _point_in_polygon
 from backend.task_planner.terrain import get_elevations
 
 logger = logging.getLogger(__name__)
@@ -172,7 +174,8 @@ def _fetch_openaip_pages(endpoint: str, params: dict, headers: dict) -> list[dic
         params['page'] = page
         params['limit'] = 300
         try:
-            resp = requests.get(
+            resp = request_with_retry(
+                'GET',
                 f'{_OPENAIP_BASE}/{endpoint}',
                 params=params,
                 headers=headers,
@@ -180,6 +183,13 @@ def _fetch_openaip_pages(endpoint: str, params: dict, headers: dict) -> list[dic
             )
             resp.raise_for_status()
             data = resp.json()
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status in RETRY_STATUSES:
+                raise RuntimeError(
+                    f'OpenAIP is busy right now (HTTP {status}). Please wait a moment and try again.'
+                ) from exc
+            raise RuntimeError(f'OpenAIP API error ({endpoint}): {exc}') from exc
         except requests.RequestException as exc:
             raise RuntimeError(f'OpenAIP API error ({endpoint}): {exc}') from exc
         except ValueError as exc:
@@ -491,7 +501,8 @@ def query_osm_places(
     )
 
     try:
-        resp = requests.post(
+        resp = request_with_retry(
+            'POST',
             _OVERPASS_URL,
             data={'data': query},
             timeout=30,
@@ -499,6 +510,15 @@ def query_osm_places(
         )
         resp.raise_for_status()
         data = resp.json()
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else None
+        logger.warning('Overpass API request failed after retries (HTTP %s): %s', status, exc)
+        if status in RETRY_STATUSES:
+            raise RuntimeError(
+                f'OpenStreetMap is busy right now (HTTP {status}). '
+                'Please wait a moment and try again, or select a smaller area.'
+            ) from exc
+        raise RuntimeError(f'OpenStreetMap query failed: {exc}') from exc
     except requests.RequestException as exc:
         logger.warning('Overpass API request failed: %s', exc)
         raise RuntimeError(f'OpenStreetMap query failed: {exc}') from exc
@@ -579,8 +599,15 @@ def generate_waypoints(
     min_lon: float,
     max_lon: float,
     types: Sequence[str],
+    polygon: Sequence[tuple[float, float]] | None = None,
 ) -> dict:
-    """Generate waypoints for the given bbox and type list.
+    """Generate waypoints for the given area and type list.
+
+    The bbox (``min_lat``/``max_lat``/``min_lon``/``max_lon``) is used to query
+    the OpenAIP and Overpass APIs, which only support rectangular filters. When
+    ``polygon`` (a list of ``(lat, lon)`` vertices) is supplied, the results are
+    further filtered down to points that fall inside that custom area, so the
+    bbox should be the bounding box of the polygon.
 
     Returns::
         {
@@ -623,6 +650,17 @@ def generate_waypoints(
         except RuntimeError as exc:
             osm_error = str(exc)
             warnings.append(f'Populated places could not be fetched: {osm_error}')
+
+    # Restrict to the custom polygon area (the APIs were queried by bounding box).
+    if polygon and len(polygon) >= 3:
+        aviation_wps = [
+            wp for wp in aviation_wps
+            if _point_in_polygon(wp.latitude, wp.longitude, polygon)
+        ]
+        osm_wps = [
+            wp for wp in osm_wps
+            if _point_in_polygon(wp.latitude, wp.longitude, polygon)
+        ]
 
     result: dict = {
         'waypoints': aviation_wps + osm_wps,
