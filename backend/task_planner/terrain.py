@@ -16,6 +16,8 @@ from typing import Optional
 
 import requests
 
+from backend.http_retry import request_with_retry
+
 logger = logging.getLogger(__name__)
 
 # Open-Meteo Elevation API — free, no key, bulk-capable
@@ -43,7 +45,8 @@ def get_elevations(points: list[tuple[float, float]]) -> dict[tuple[float, float
         lons = ",".join(f"{p[1]:.4f}" for p in batch)
 
         try:
-            resp = requests.get(
+            resp = request_with_retry(
+                'GET',
                 ELEVATION_API_URL,
                 params={"latitude": lats, "longitude": lons},
                 timeout=15,
