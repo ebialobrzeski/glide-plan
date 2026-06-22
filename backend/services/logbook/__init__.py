@@ -1,1 +1,0 @@
-"""GlideLog service layer."""
