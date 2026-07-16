@@ -152,8 +152,8 @@ def fetch_airspace_from_openaip(
             resp = requests.get(
                 f"{OPENAIP_BASE_URL}/airspaces",
                 params={
-                    "pos": f"{(min_lat + max_lat) / 2},{(min_lon + max_lon) / 2}",
-                    "dist": _bbox_diagonal_km(bbox) * 500,  # radius in metres
+                    # OpenAIP bbox filter: min_lon,min_lat,max_lon,max_lat (W,S,E,N)
+                    "bbox": f"{min_lon},{min_lat},{max_lon},{max_lat}",
                     "page": page,
                     "limit": 100,
                 },
@@ -187,17 +187,6 @@ def fetch_airspace_from_openaip(
         logger.error("OpenAIP API error: %s", exc)
 
     return zones
-
-
-def _bbox_diagonal_km(bbox: tuple[float, float, float, float]) -> float:
-    """Approximate diagonal distance of a bbox in km."""
-    min_lat, min_lon, max_lat, max_lon = bbox
-    dlat = max_lat - min_lat
-    dlon = max_lon - min_lon
-    avg_lat = (min_lat + max_lat) / 2
-    km_lat = dlat * 111.32
-    km_lon = dlon * 111.32 * math.cos(math.radians(avg_lat))
-    return math.sqrt(km_lat ** 2 + km_lon ** 2)
 
 
 def _parse_openaip_airspace(item: dict) -> Optional[AirspaceZone]:
