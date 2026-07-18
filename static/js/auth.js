@@ -29,6 +29,43 @@ class AuthManager {
         await this.fetchCurrentUser();
         this.updateHeaderUI();
         this._notifyAuthChange();
+        this._handleLoginRedirect();
+    }
+
+    /**
+     * When another app (e.g. GlideLog) redirects here with ?login=1 because the
+     * visitor isn't authenticated, auto-open the login dialog. A ?next=<url>
+     * param is remembered and the browser is sent there after a successful
+     * login. If the user already has a valid session, honour ?next immediately.
+     */
+    _handleLoginRedirect() {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.has('login')) return;
+        const next = this._safeNextUrl(params.get('next'));
+        if (this.isAuthenticated) {
+            if (next) window.location.replace(next);
+            return;
+        }
+        this._postLoginRedirect = next;
+        this.showLoginDialog();
+    }
+
+    /**
+     * Validate a ?next redirect target to prevent open redirects. Accepts a
+     * relative path, or an absolute URL whose host shares this page's
+     * registrable domain (e.g. ab-log.glideplan.org when we're on
+     * glideplan.org). Returns the URL string or null if not allowed.
+     */
+    _safeNextUrl(next) {
+        if (!next) return null;
+        try {
+            const url = new URL(next, window.location.origin);
+            if (url.origin === window.location.origin) return url.href;
+            if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+            const base = window.location.hostname.split('.').slice(-2).join('.');
+            if (url.hostname === base || url.hostname.endsWith('.' + base)) return url.href;
+        } catch (_) { /* malformed — reject */ }
+        return null;
     }
 
     _bindDialogButtons() {
@@ -244,6 +281,12 @@ class AuthManager {
             // Apply user's preferred language if set
             if (data.user?.preferred_language) {
                 window.i18n?.setLanguage(data.user.preferred_language);
+            }
+            // If we arrived here via another app's ?login=1&next=… redirect,
+            // send the browser back to where it came from now that we're in.
+            if (this._postLoginRedirect) {
+                window.location.replace(this._postLoginRedirect);
+                return;
             }
             this._promptSessionMigration();
         } catch (err) {

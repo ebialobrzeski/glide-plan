@@ -14,6 +14,10 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'), ov
 SECRET_KEY: str = os.environ.get('SECRET_KEY', 'CHANGE-ME-IN-PRODUCTION')
 BASE_URL: str = os.environ.get('BASE_URL', '')
 FLASK_DEBUG: bool = os.environ.get('FLASK_DEBUG', '0').lower() in ('1', 'true', 'yes')
+# Session cookie domain — set to a shared parent domain (e.g. .glideplan.org)
+# so the login session is shared with the standalone GlideLog app on another
+# subdomain. Leave empty for single-host deployments.
+SESSION_COOKIE_DOMAIN: str = os.environ.get('SESSION_COOKIE_DOMAIN', '')
 
 # Database
 DATABASE_URL: str = os.environ.get('DATABASE_URL', '')

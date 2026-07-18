@@ -37,6 +37,34 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - RESEND_FROM_ADDRESS=${RESEND_FROM_ADDRESS:-noreply@glideplan.org}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Share the login cookie with GlideLog when both run on sibling
+      # subdomains (e.g. .glideplan.org); leave empty for single-host setups.
+      - SESSION_COOKIE_DOMAIN=${SESSION_COOKIE_DOMAIN:-}
+    depends_on:
+      postgres_gliding:
+        condition: service_healthy
+
+  glidelog:
+    build: ./glidelog
+    container_name: glidelog
+    restart: always
+    ports:
+      - "5001:5001"
+    volumes:
+      # Persist logs only — GlideLog holds no local file state
+      - ./glidelog/logs:/app/logs
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+      # MUST match glideplan's SECRET_KEY so the login session cookie is shared
+      - SECRET_KEY=${SECRET_KEY:-change_this_secret_key_in_production}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-glideplan}:${POSTGRES_PASSWORD:-changeme_secure_password}@postgres_gliding:5432/${POSTGRES_DB:-gliding_forecast}
+      # Public URL of the main GlidePlan app — used for login/logout links
+      - GLIDEPLAN_URL=${GLIDEPLAN_URL:-http://localhost:5000}
+      # Set to a shared parent domain (e.g. .glideplan.org) when the two apps
+      # live on different subdomains; leave empty for same-host deployments.
+      - SESSION_COOKIE_DOMAIN=${SESSION_COOKIE_DOMAIN:-}
+      - GLIDELOG_SCHEDULER_ENABLED=${GLIDELOG_SCHEDULER_ENABLED:-1}
     depends_on:
       postgres_gliding:
         condition: service_healthy
