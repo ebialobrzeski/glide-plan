@@ -557,7 +557,7 @@
             <i class="fas fa-arrow-left"></i>
             <span data-i18n="logbook.nav.back_to_glideplan">Back to GlidePlan</span>
         </a>
-        <a href="{{ GLIDEPLAN_URL }}/auth/logout">
+        <a href="/logbook/logout">
             <i class="fas fa-right-from-bracket"></i>
             <span data-i18n="logbook.nav.logout">Log out</span>
         </a>
@@ -598,7 +598,7 @@
         <div class="gl-topbar-user">
             <sl-badge variant="{% if current_user.tier == 'admin' %}success{% elif current_user.tier == 'premium' %}primary{% else %}neutral{% endif %}" pill>{{ current_user.tier.upper() }}</sl-badge>
             <span>{{ current_user.display_name }}</span>
-            <sl-icon-button name="box-arrow-right" href="{{ GLIDEPLAN_URL }}/auth/logout" data-i18n-title="logbook.nav.logout" label="Log out"></sl-icon-button>
+            <sl-icon-button name="box-arrow-right" href="/logbook/logout" data-i18n-title="logbook.nav.logout" label="Log out"></sl-icon-button>
         </div>
         <sl-divider vertical></sl-divider>
 
