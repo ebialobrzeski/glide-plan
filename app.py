@@ -22,7 +22,7 @@ import requests
 import time as _time  # noqa: F401
 
 # backend.config loads dotenv from .env at import time
-from backend.config import STYLE_OPTIONS, SECRET_KEY, FLASK_DEBUG
+from backend.config import STYLE_OPTIONS, SECRET_KEY, FLASK_DEBUG, SESSION_COOKIE_DOMAIN
 from backend.models.legacy import Waypoint
 from backend.file_io import (
     parse_cup_file, write_cup_file, parse_csv_file, write_csv_file, get_elevation,
@@ -55,6 +55,11 @@ if app.secret_key in INSECURE_SECRET_KEYS:
         )
 
 CORS(app)
+
+# Share the login session cookie with the standalone GlideLog app when it runs
+# on a sibling subdomain (requires the same SECRET_KEY on both).
+if SESSION_COOKIE_DOMAIN:
+    app.config['SESSION_COOKIE_DOMAIN'] = SESSION_COOKIE_DOMAIN
 
 # ── Flask-Login ──────────────────────────────────────────────────────────────
 login_manager = LoginManager(app)

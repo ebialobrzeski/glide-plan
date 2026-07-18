@@ -37,6 +37,9 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - RESEND_FROM_ADDRESS=${RESEND_FROM_ADDRESS:-noreply@glideplan.org}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Share the login cookie with GlideLog when both run on sibling
+      # subdomains (e.g. .glideplan.org); leave empty for single-host setups.
+      - SESSION_COOKIE_DOMAIN=${SESSION_COOKIE_DOMAIN:-}
     depends_on:
       postgres_gliding:
         condition: service_healthy
