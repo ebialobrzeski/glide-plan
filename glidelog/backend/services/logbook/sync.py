@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import logging
 import threading
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import update as sa_update
+from sqlalchemy import text, update as sa_update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,12 @@ from backend.models.sync_log import SyncLog
 from backend.services.connectors import get_connector
 
 logger = logging.getLogger(__name__)
+
+# Days to look back BEFORE the most recent stored flight when syncing.
+# Flights are often entered several days late, so a backdated flight can land
+# earlier than one we already have. Re-scanning this buffer each sync catches
+# them; ON CONFLICT keeps the overlap idempotent.
+_BACKFILL_BUFFER_DAYS = 14
 
 
 def sync_connector(db: Session, connector: Connector) -> SyncLog:
@@ -29,10 +35,30 @@ def sync_connector(db: Session, connector: Connector) -> SyncLog:
     imported = 0
 
     try:
-        # Determine incremental date range
-        date_from = date(2000, 1, 1)
-        if connector.last_sync_at and connector.last_sync_status == 'success':
-            date_from = connector.last_sync_at.date()
+        # Determine the fetch window.
+        #
+        # We anchor date_from to the date of the most recent flight already
+        # stored for this connector — NOT to the last sync time — minus a
+        # buffer. Flights are frequently entered a few days after the flight
+        # itself, so a backdated flight can appear in the source only after a
+        # sync and even predate the newest flight we already hold. Re-fetching
+        # from (latest flight date - buffer) each time catches those late
+        # entries; ON CONFLICT (user_id, external_id) keeps the overlapping
+        # re-fetch idempotent (no duplicates).
+        latest_flight_date = (
+            db.query(Flight.date)
+            .filter(
+                Flight.connector_id == connector_id,
+                Flight.date.isnot(None),
+            )
+            .order_by(Flight.date.desc())
+            .limit(1)
+            .scalar()
+        )
+        if latest_flight_date:
+            date_from = latest_flight_date - timedelta(days=_BACKFILL_BUFFER_DAYS)
+        else:
+            date_from = date(2000, 1, 1)
 
         impl = get_connector(connector)
         raw_flights = impl.fetch_flights(date_from, date.today())
@@ -49,9 +75,15 @@ def sync_connector(db: Session, connector: Connector) -> SyncLog:
                         'aircraft_reg':  flight_row['aircraft_reg'],
                     },
                 )
+                # xmax = 0 on the returned row means it was INSERTed rather than
+                # UPDATEd. Since we now re-fetch an overlapping date window every
+                # sync, most rows are UPDATEs — count only genuine inserts so the
+                # "imported" total and the fun-stats regen trigger stay accurate.
+                .returning(text('(xmax = 0) AS inserted'))
             )
             result = db.execute(stmt)
-            if result.rowcount:
+            row = result.first()
+            if row is not None and row.inserted:
                 imported += 1
 
         finished_at = datetime.now(timezone.utc)
