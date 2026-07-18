@@ -79,8 +79,10 @@ def unauthorized():
     """API routes get 401 JSON; page routes redirect to the main app's login."""
     if request.path.startswith('/api/') or request.headers.get('Accept', '').startswith('application/json'):
         return jsonify({'error': 'Authentication required.'}), 401
-    login_url = f'{GLIDEPLAN_URL}/?login=1&next={request.url}' if GLIDEPLAN_URL else '/?login=1'
-    return redirect(login_url)
+    from urllib.parse import quote
+    next_url = quote(request.url, safe='')
+    base = GLIDEPLAN_URL if GLIDEPLAN_URL else ''
+    return redirect(f'{base}/?login=1&next={next_url}')
 
 
 # ── Template context — expose the main app URL for cross-app links ────────────
