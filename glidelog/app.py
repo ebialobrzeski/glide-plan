@@ -17,6 +17,7 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask, jsonify, redirect, request
 from flask_cors import CORS
 from flask_login import LoginManager
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # backend.config loads dotenv from .env at import time
 from backend.config import SECRET_KEY, FLASK_DEBUG, GLIDEPLAN_URL, SESSION_COOKIE_DOMAIN
@@ -30,6 +31,11 @@ from backend.routes.i18n import i18n_bp
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
+
+# Behind Cloudflare / a reverse proxy, trust the forwarded proto and host so
+# request.url reports https://<public-host>/… instead of http://<internal>.
+# Without this the ?next= redirect target is built with the wrong scheme.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
 INSECURE_SECRET_KEYS = {'CHANGE-ME-IN-PRODUCTION', 'CHANGE-ME', 'change_this_secret_key_in_production'}
 if app.secret_key in INSECURE_SECRET_KEYS:
