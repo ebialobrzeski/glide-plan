@@ -18,6 +18,7 @@ from flask import Flask, render_template, request, jsonify, send_file, session
 from flask_cors import CORS
 from flask_login import LoginManager
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 import requests
 import time as _time  # noqa: F401
 
@@ -41,6 +42,11 @@ from backend.task_planner.routes import ai_planner_bp
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
+
+# Behind Cloudflare / a reverse proxy, trust the forwarded proto and host so
+# request.url / request.host_url report the public https URL. This keeps share
+# links and the GlideLog login round-trip on the correct scheme and host.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
 INSECURE_SECRET_KEYS = {'CHANGE-ME-IN-PRODUCTION', 'CHANGE-ME', 'change_this_secret_key_in_production'}
 if app.secret_key in INSECURE_SECRET_KEYS:
