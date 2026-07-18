@@ -1,0 +1,255 @@
+{% extends 'logbook/base.html' %}
+{% block title %}<span data-i18n="logbook.flights.page_title">Flights</span>{% endblock %}
+{% block page_title %}<span data-i18n="logbook.flights.page_title">Flights</span>{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="card">
+    <div class="form-row">
+        <div class="form-group">
+            <label data-i18n="logbook.flights.date_from">Date from</label>
+            <input type="date" id="dateFrom">
+        </div>
+        <div class="form-group">
+            <label data-i18n="logbook.flights.date_to">Date to</label>
+            <input type="date" id="dateTo">
+        </div>
+        <div class="form-group">
+            <label data-i18n="logbook.flights.aircraft_type">Aircraft type</label>
+            <input type="text" id="aircraftType" data-i18n-placeholder="logbook.flights.aircraft_type" placeholder="Aircraft type">
+        </div>
+        <div class="form-group">
+            <label data-i18n="logbook.flights.launch_method">Launch method</label>
+            <select id="launchType">
+                <option value="" data-i18n="logbook.flights.all">All</option>
+                <option value="W" data-i18n="logbook.flights.winch">W — winch</option>
+                <option value="S" data-i18n="logbook.flights.aerotow">S — aerotow</option>
+                <option value="E" data-i18n="logbook.flights.electric">E — electric/motor</option>
+            </select>
+        </div>
+        <div class="form-group" style="justify-content:flex-end;flex-direction:row;align-items:flex-end;gap:8px">
+            <button class="btn btn-primary" onclick="loadFlights(1)">
+                <i class="fa fa-search"></i> <span data-i18n="logbook.flights.search">Search</span>
+            </button>
+            <button class="btn btn-secondary" onclick="clearFilters()">
+                <span data-i18n="logbook.flights.clear">Clear</span>
+            </button>
+            <button class="btn btn-secondary" onclick="openManualModal()">
+                <i class="fa fa-plus"></i> <span data-i18n="logbook.flights.add_flight">Add flight</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th data-i18n="logbook.tbl.date">Date</th>
+                    <th data-i18n="logbook.tbl.aircraft">Aircraft</th>
+                    <th data-i18n="logbook.flights.registration">Registration</th>
+                    <th data-i18n="logbook.tbl.takeoff">Take-off</th>
+                    <th data-i18n="logbook.tbl.landing">Landing</th>
+                    <th data-i18n="logbook.flights.duration_min">Duration (min)</th>
+                    <th data-i18n="logbook.tbl.task">Task</th>
+                    <th data-i18n="logbook.tbl.launch">Launch</th>
+                    <th data-i18n="logbook.tbl.price">Price (zł)</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="flightsBody">
+                <tr><td colspan="10" class="loading"><i class="fa fa-spinner fa-spin"></i> <span data-i18n="logbook.flights.loading">Loading…</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination">
+        <span class="page-info" id="pageInfo"></span>
+        <button class="btn btn-secondary btn-sm" id="prevBtn" onclick="changePage(-1)" data-i18n="logbook.flights.prev">‹ Prev</button>
+        <button class="btn btn-secondary btn-sm" id="nextBtn" onclick="changePage(1)" data-i18n="logbook.flights.next">Next ›</button>
+    </div>
+</div>
+
+<!-- Manual flight modal -->
+<div id="manualModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center">
+    <div class="card" style="width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;margin:0">
+        <h3 id="modalTitle" style="margin-bottom:16px" data-i18n="logbook.flights.add_modal_title">Add flight manually</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label><span data-i18n="logbook.tbl.date">Date</span> *</label>
+                <input type="date" id="mDate">
+            </div>
+            <div class="form-group">
+                <label><span data-i18n="logbook.flights.launch_method">Launch method</span> *</label>
+                <select id="mLaunch">
+                    <option value="W" data-i18n="logbook.flights.winch">W — winch</option>
+                    <option value="S" data-i18n="logbook.flights.aerotow">S — aerotow</option>
+                    <option value="E" data-i18n="logbook.flights.electric">E — electric/motor</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label data-i18n="logbook.tbl.aircraft">Aircraft</label>
+                <input type="text" id="mAircraftType" placeholder="SZD-50-3">
+            </div>
+            <div class="form-group">
+                <label data-i18n="logbook.flights.registration">Registration</label>
+                <input type="text" id="mAircraftReg" placeholder="SP-3788">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label data-i18n="logbook.flights.takeoff_airport">Takeoff airport</label>
+                <input type="text" id="mTakeoffAirport" placeholder="EPBK">
+            </div>
+            <div class="form-group">
+                <label data-i18n="logbook.flights.takeoff_time">Takeoff time</label>
+                <input type="time" id="mTakeoffTime">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label data-i18n="logbook.flights.landing_airport">Landing airport</label>
+                <input type="text" id="mLandingAirport" placeholder="EPBK">
+            </div>
+            <div class="form-group">
+                <label data-i18n="logbook.flights.landing_time">Landing time</label>
+                <input type="time" id="mLandingTime">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label data-i18n="logbook.flights.flight_time_min">Flight time (min)</label>
+                <input type="number" id="mFlightTime" min="0">
+            </div>
+            <div class="form-group">
+                <label data-i18n="logbook.tbl.task">Task</label>
+                <input type="text" id="mTask" placeholder="SPL / I-1">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label data-i18n="logbook.flights.pilot">Pilot</label>
+                <input type="text" id="mPilot">
+            </div>
+            <div class="form-group">
+                <label data-i18n="logbook.flights.instructor">Instructor</label>
+                <input type="text" id="mInstructor">
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:8px">
+            <button class="btn btn-primary" onclick="saveManualFlight()" data-i18n="logbook.btn.save">Save</button>
+            <button class="btn btn-secondary" onclick="closeManualModal()" data-i18n="logbook.btn.cancel">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 1;
+let totalPages = 1;
+
+function buildParams(page) {
+    const p = new URLSearchParams();
+    if (document.getElementById('dateFrom').value) p.set('date_from', document.getElementById('dateFrom').value);
+    if (document.getElementById('dateTo').value) p.set('date_to', document.getElementById('dateTo').value);
+    if (document.getElementById('aircraftType').value) p.set('aircraft_type', document.getElementById('aircraftType').value);
+    if (document.getElementById('launchType').value) p.set('launch_type', document.getElementById('launchType').value);
+    p.set('page', page);
+    p.set('limit', 50);
+    return p;
+}
+
+async function loadFlights(page = 1) {
+    currentPage = page;
+    const tbody = document.getElementById('flightsBody');
+    const loadingMsg = window.i18n ? window.i18n.t('logbook.flights.loading', 'Loading…') : 'Loading…';
+    tbody.innerHTML = `<tr><td colspan="10" class="loading"><i class="fa fa-spinner fa-spin"></i> ${loadingMsg}</td></tr>`;
+
+    const resp = await fetch('/logbook/api/flights?' + buildParams(page));
+    const data = await resp.json();
+    totalPages = data.pages || 1;
+
+    if (!data.flights || data.flights.length === 0) {
+        const noFlights = window.i18n ? window.i18n.t('logbook.empty.no_flights', 'No flights recorded') : 'No flights recorded';
+        tbody.innerHTML = `<tr><td colspan="10" class="empty">${noFlights}</td></tr>`;
+    } else {
+        tbody.innerHTML = data.flights.map(f => `
+            <tr>
+                <td>${f.date || ''}</td>
+                <td>${f.aircraft_type || ''}</td>
+                <td>${f.aircraft_reg || ''}</td>
+                <td>${f.takeoff_airport || ''} ${f.takeoff_time || ''}</td>
+                <td>${f.landing_airport || ''} ${f.landing_time || ''}</td>
+                <td>${f.flight_time_min ?? ''}</td>
+                <td>${f.task || ''}</td>
+                <td><span class="badge badge-info">${f.launch_type || ''}</span></td>
+                <td>${f.price != null ? f.price.toFixed(2) : ''}</td>
+                <td>${f.source === 'manual' ? `<button class="btn btn-danger btn-sm" onclick="deleteFlight('${f.id}')"><i class="fa fa-trash"></i></button>` : ''}</td>
+            </tr>
+        `).join('');
+    }
+
+    document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages} (${data.total})`;
+    document.getElementById('prevBtn').disabled = currentPage <= 1;
+    document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+}
+
+function changePage(dir) { if (currentPage + dir >= 1 && currentPage + dir <= totalPages) loadFlights(currentPage + dir); }
+
+function clearFilters() {
+    ['dateFrom','dateTo','aircraftType'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('launchType').value = '';
+    loadFlights(1);
+}
+
+async function deleteFlight(id) {
+    const msg = window.i18n ? window.i18n.t('logbook.flights.delete_confirm', 'Delete this flight?') : 'Delete this flight?';
+    if (!confirm(msg)) return;
+    const resp = await fetch(`/logbook/api/flights/${id}`, { method: 'DELETE' });
+    if (resp.ok) {
+        showToast(window.i18n ? window.i18n.t('logbook.flights.deleted', 'Flight deleted') : 'Flight deleted');
+        loadFlights(currentPage);
+    } else {
+        const d = await resp.json();
+        showToast(d.error || 'Error', 'error');
+    }
+}
+
+function openManualModal() { document.getElementById('manualModal').style.display = 'flex'; }
+function closeManualModal() { document.getElementById('manualModal').style.display = 'none'; }
+
+async function saveManualFlight() {
+    const body = {
+        date: document.getElementById('mDate').value,
+        launch_type: document.getElementById('mLaunch').value,
+        aircraft_type: document.getElementById('mAircraftType').value,
+        aircraft_reg: document.getElementById('mAircraftReg').value,
+        takeoff_airport: document.getElementById('mTakeoffAirport').value,
+        takeoff_time: document.getElementById('mTakeoffTime').value,
+        landing_airport: document.getElementById('mLandingAirport').value,
+        landing_time: document.getElementById('mLandingTime').value,
+        flight_time_min: parseInt(document.getElementById('mFlightTime').value) || null,
+        task: document.getElementById('mTask').value,
+        pilot: document.getElementById('mPilot').value,
+        instructor: document.getElementById('mInstructor').value,
+    };
+    const resp = await fetch('/logbook/api/flights/manual', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const d = await resp.json();
+    if (resp.ok) {
+        showToast(window.i18n ? window.i18n.t('logbook.flights.saved', 'Flight saved') : 'Flight saved');
+        closeManualModal();
+        loadFlights(currentPage);
+    } else {
+        showToast(d.error || 'Error', 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => loadFlights(1));
+</script>
+{% endblock %}

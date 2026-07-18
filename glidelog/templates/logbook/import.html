@@ -1,0 +1,331 @@
+{% extends 'logbook/base.html' %}
+{% block title %}<span data-i18n="logbook.nav.import">Import</span>{% endblock %}
+{% block page_title %}<span data-i18n="logbook.import.page_title">Import &amp; Add Flight</span>{% endblock %}
+
+{% block head %}
+<style>
+.source-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+}
+@media(max-width:700px){ .source-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.source-card {
+    border: 2px solid var(--gl-border);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    background: var(--gl-surface);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.source-card:hover   { border-color: var(--gl-primary); background: rgba(37,99,235,.04); }
+.source-card.active  { border-color: var(--gl-primary); background: rgba(37,99,235,.08); }
+
+.source-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 2px;
+}
+.source-name   { font-weight: 700; font-size: 0.9rem; }
+.source-desc   { font-size: 0.75rem; color: var(--gl-muted); }
+.source-tags   { font-size: 0.68rem; color: rgba(100,116,139,.7); }
+
+.drop-zone {
+    border: 2px dashed var(--gl-border);
+    border-radius: 12px;
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--gl-primary);
+    background: rgba(37,99,235,.04);
+}
+.drop-zone-icon { font-size: 2rem; color: var(--gl-muted); margin-bottom: 10px; }
+.drop-zone-text { font-size: 0.9rem; font-weight: 500; color: var(--gl-text); }
+.drop-zone-sub  { font-size: 0.78rem; color: var(--gl-muted); margin-top: 4px; }
+.drop-zone-link { color: var(--gl-primary); text-decoration: underline; cursor: pointer; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('upload', this)" data-i18n="logbook.import.tab.file">Import from file</div>
+    <div class="tab" onclick="switchTab('manual', this)" data-i18n="logbook.import.tab.manual">Manual entry</div>
+    <div class="tab" onclick="switchTab('history', this)" data-i18n="logbook.import.tab.history">Import history</div>
+</div>
+
+<!-- ── Upload tab ─────────────────────────────────────────────────────────── -->
+<div id="tab-upload">
+    <div class="card">
+        <div class="card-title" data-i18n="logbook.import.choose_source">Choose source</div>
+
+        <div class="source-grid">
+            <div class="source-card active" data-source="leonardo" onclick="selectSource(this)">
+                <div class="source-icon" style="background:#1e3a8a">LC</div>
+                <div class="source-name">Leonardo</div>
+                <div class="source-desc" data-i18n="logbook.import.src.leonardo.desc">European EASA logbook system</div>
+                <div class="source-tags">CSV · XML</div>
+            </div>
+            <div class="source-card" data-source="seeyou" onclick="selectSource(this)">
+                <div class="source-icon" style="background:#4b5563">SL</div>
+                <div class="source-name">SeeYou / Naviter</div>
+                <div class="source-desc" data-i18n="logbook.import.src.seeyou.desc">IGC + thermal metadata</div>
+                <div class="source-tags">IGC · CSV</div>
+            </div>
+            <div class="source-card" data-source="weglide" onclick="selectSource(this)">
+                <div class="source-icon" style="background:#78350f">WC</div>
+                <div class="source-name">WeGlide</div>
+                <div class="source-desc" data-i18n="logbook.import.src.weglide.desc">Online platform for glider pilots</div>
+                <div class="source-tags">CSV</div>
+            </div>
+            <div class="source-card" data-source="excel" onclick="selectSource(this)">
+                <div class="source-icon" style="background:#166534">XLS</div>
+                <div class="source-name">Excel / CSV</div>
+                <div class="source-desc" data-i18n="logbook.import.src.excel.desc">Your own spreadsheet or export</div>
+                <div class="source-tags">XLSX · CSV</div>
+            </div>
+            <div class="source-card" data-source="csv" onclick="selectSource(this)">
+                <div class="source-icon" style="background:#065f46">GL</div>
+                <div class="source-name">Glide &amp; Seek</div>
+                <div class="source-desc" data-i18n="logbook.import.src.glide_seek.desc">Mobile app for glider pilots</div>
+                <div class="source-tags">CSV</div>
+            </div>
+            <div class="source-card" data-source="igc" onclick="selectSource(this)">
+                <div class="source-icon" style="background:#374151">IGC</div>
+                <div class="source-name" data-i18n="logbook.import.src.igc.name">IGC File</div>
+                <div class="source-desc" data-i18n="logbook.import.src.igc.desc">Raw GPS recorder file</div>
+                <div class="source-tags">IGC</div>
+            </div>
+        </div>
+
+        <div class="drop-zone" id="dropZone"
+             onclick="document.getElementById('fileInput').click()"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="handleDrop(event)">
+            <div class="drop-zone-icon"><i class="fas fa-file-arrow-up"></i></div>
+            <div class="drop-zone-text" data-i18n="logbook.import.drop_here">Drag file here</div>
+            <div class="drop-zone-sub">
+                <span data-i18n="logbook.import.or">or</span>
+                <span class="drop-zone-link" data-i18n="logbook.import.choose_from_disk">choose from disk</span>
+            </div>
+            <div class="drop-zone-sub" style="margin-top:6px" data-i18n="logbook.import.accepted_formats">CSV, XLSX, IGC, XML · max 10 MB</div>
+            <input type="file" id="fileInput" style="display:none" accept=".csv,.xlsx,.igc,.xml"
+                   onchange="handleFileSelect(this.files[0])">
+        </div>
+    </div>
+
+    <!-- Preview section -->
+    <div id="previewSection" style="display:none">
+        <div class="card">
+            <div class="card-title" data-i18n="logbook.import.preview">Import preview</div>
+            <div id="previewSummary" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
+            <div id="previewTable"></div>
+            <div style="margin-top:16px;display:flex;gap:10px">
+                <button class="btn btn-primary" onclick="confirmImport()">
+                    <i class="fas fa-check"></i> <span data-i18n="logbook.import.confirm">Confirm import</span>
+                </button>
+                <button class="btn btn-secondary" onclick="cancelPreview()" data-i18n="logbook.btn.cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Manual tab ─────────────────────────────────────────────────────────── -->
+<div id="tab-manual" style="display:none">
+    <div class="card">
+        <div class="card-title" data-i18n="logbook.import.manual.title">Manual flight entry</div>
+        <p style="color:var(--gl-muted);font-size:.875rem;margin-bottom:16px" data-i18n="logbook.import.manual.desc">
+            To add a flight manually, go to the flights table and use the "Add flight" button.
+        </p>
+        <a class="btn btn-primary" href="/logbook/flights">
+            <i class="fas fa-plus"></i> <span data-i18n="logbook.import.manual.go">Open flights table</span>
+        </a>
+    </div>
+</div>
+
+<!-- ── History tab ────────────────────────────────────────────────────────── -->
+<div id="tab-history" style="display:none">
+    <div class="card">
+        <div class="card-title" data-i18n="logbook.import.tab.history">Import history</div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr>
+                    <th data-i18n="logbook.tbl.date">Date</th>
+                    <th data-i18n="logbook.import.tbl.source">Source</th>
+                    <th data-i18n="logbook.import.tbl.file">File</th>
+                    <th data-i18n="logbook.import.tbl.new">New</th>
+                    <th data-i18n="logbook.import.tbl.dup">Duplicates</th>
+                    <th data-i18n="logbook.import.tbl.errors">Errors</th>
+                    <th data-i18n="logbook.tbl.status">Status</th>
+                </tr></thead>
+                <tbody id="historyBody">
+                    <tr><td colspan="7" class="loading"><i class="fas fa-spinner fa-spin"></i></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let previewData   = null;
+let selectedSource = 'leonardo';
+
+function selectSource(el) {
+    document.querySelectorAll('.source-card').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    selectedSource = el.dataset.source;
+}
+
+function switchTab(name, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    ['upload', 'manual', 'history'].forEach(id => {
+        document.getElementById('tab-' + id).style.display = id === name ? '' : 'none';
+    });
+    if (name === 'history') loadHistory();
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('dropZone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+}
+
+async function handleFileSelect(file) {
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    form.append('source_type', selectedSource);
+
+    showToast(window.i18n?.t('logbook.import.uploading', 'Uploading…'), 'info');
+    const up = await fetch('/logbook/api/import/upload', { method: 'POST', body: form });
+    if (!up.ok) {
+        const d = await up.json();
+        showToast(d.error || 'Upload failed', 'error');
+        return;
+    }
+
+    showToast(window.i18n?.t('logbook.import.previewing', 'Generating preview…'), 'info');
+    const prev = await fetch('/logbook/api/import/preview', { method: 'POST' });
+    const data = await prev.json();
+    if (!prev.ok) {
+        showToast(data.error || 'Preview failed', 'error');
+        return;
+    }
+
+    previewData = data;
+    renderPreview(data);
+    document.getElementById('previewSection').style.display = '';
+}
+
+function renderPreview(data) {
+    const ok  = data.new       || [];
+    const dup = data.duplicate || [];
+    const err = data.error     || [];
+
+    document.getElementById('previewSummary').innerHTML = `
+        <div class="kpi" style="padding:12px 16px">
+            <div class="kpi-label">${window.i18n?.t('logbook.import.tbl.new','New')}</div>
+            <div class="kpi-value" style="font-size:1.4rem;color:var(--gl-success)">${ok.length}</div>
+        </div>
+        <div class="kpi" style="padding:12px 16px">
+            <div class="kpi-label">${window.i18n?.t('logbook.import.tbl.dup','Duplicates')}</div>
+            <div class="kpi-value" style="font-size:1.4rem;color:var(--gl-warning)">${dup.length}</div>
+        </div>
+        <div class="kpi" style="padding:12px 16px">
+            <div class="kpi-label">${window.i18n?.t('logbook.import.tbl.errors','Errors')}</div>
+            <div class="kpi-value" style="font-size:1.4rem;color:var(--gl-danger)">${err.length}</div>
+        </div>
+    `;
+
+    const tableEl = document.getElementById('previewTable');
+    const rows    = ok.slice(0, 20);
+    if (!rows.length) {
+        tableEl.innerHTML = `<p class="empty">${window.i18n?.t('logbook.import.no_new','No new flights to import.')}</p>`;
+        return;
+    }
+    tableEl.innerHTML = `<div class="table-wrap"><table>
+        <thead><tr>
+            <th>${window.i18n?.t('logbook.tbl.date','Date')}</th>
+            <th>${window.i18n?.t('logbook.tbl.aircraft','Aircraft')}</th>
+            <th>${window.i18n?.t('logbook.tbl.reg','Reg')}</th>
+            <th>${window.i18n?.t('logbook.tbl.takeoff','Take-off')}</th>
+            <th>${window.i18n?.t('logbook.tbl.landing','Landing')}</th>
+            <th>${window.i18n?.t('logbook.tbl.duration','Duration')}</th>
+        </tr></thead>
+        <tbody>${rows.map(r => `<tr>
+            <td>${r.date || ''}</td>
+            <td>${r.aircraft_type || ''}</td>
+            <td>${r.aircraft_reg || ''}</td>
+            <td>${r.takeoff_time || ''}</td>
+            <td>${r.landing_time || ''}</td>
+            <td>${r.flight_time_min != null ? r.flight_time_min + ' min' : ''}</td>
+        </tr>`).join('')}</tbody>
+    </table></div>`;
+    if (ok.length > 20) {
+        tableEl.innerHTML += `<p style="color:var(--gl-muted);font-size:.8rem;margin-top:8px">… and ${ok.length - 20} more</p>`;
+    }
+}
+
+async function confirmImport() {
+    if (!previewData) return;
+    const resp = await fetch('/logbook/api/import/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new: previewData.new })
+    });
+    const d = await resp.json();
+    if (resp.ok) {
+        showToast(`${window.i18n?.t('logbook.import.imported','Imported')} ${d.flights_new} ${window.i18n?.t('logbook.kpi.flights','flights')}`);
+        cancelPreview();
+    } else {
+        showToast(d.error || 'Import failed', 'error');
+    }
+}
+
+function cancelPreview() {
+    previewData = null;
+    document.getElementById('previewSection').style.display = 'none';
+    document.getElementById('fileInput').value = '';
+}
+
+async function loadHistory() {
+    const resp = await fetch('/logbook/api/import/history');
+    const list = await resp.json();
+    const tbody = document.getElementById('historyBody');
+    if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty">${window.i18n?.t('logbook.import.no_history','No import history')}</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = list.map(l => `<tr>
+        <td>${l.imported_at ? l.imported_at.slice(0,16).replace('T',' ') : ''}</td>
+        <td>${l.source_type || ''}</td>
+        <td>${l.filename || '—'}</td>
+        <td style="color:var(--gl-success)">${l.flights_new}</td>
+        <td style="color:var(--gl-warning)">${l.flights_dup}</td>
+        <td style="color:var(--gl-danger)">${l.flights_error}</td>
+        <td><span class="badge badge-${l.status === 'success' ? 'success' : l.status === 'partial' ? 'warning' : 'danger'}">${l.status}</span></td>
+    </tr>`).join('');
+}
+</script>
+{% endblock %}

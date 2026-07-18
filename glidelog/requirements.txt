@@ -1,0 +1,39 @@
+# Core Flask and Web Framework
+blinker==1.9.0
+Flask==3.1.3
+flask-cors==6.0.1
+Flask-Login>=0.6
+Werkzeug==3.1.6
+gunicorn==22.0.0
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+itsdangerous==2.2.0
+click==8.3.0
+colorama==0.4.6
+
+# HTTP and Networking
+requests==2.33.0
+certifi==2025.10.5
+charset-normalizer==3.4.4
+idna==3.15
+urllib3==2.7.0
+
+# Database
+SQLAlchemy>=2.0
+psycopg2-binary>=2.9
+
+# Configuration
+python-dotenv>=1.0
+
+# Encryption (connector credential storage)
+cryptography>=42.0
+
+# GlideLog — scraping and parsing
+httpx>=0.27
+beautifulsoup4>=4.12
+
+# GlideLog — Excel import
+openpyxl>=3.1
+
+# GlideLog — background scheduler
+APScheduler>=3.10
