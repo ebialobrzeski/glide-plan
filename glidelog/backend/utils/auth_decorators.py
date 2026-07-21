@@ -3,12 +3,9 @@ from __future__ import annotations
 
 from functools import wraps
 from typing import Callable
-from urllib.parse import quote
 
-from flask import jsonify, redirect, request
+from flask import jsonify, render_template, request
 from flask_login import current_user
-
-from backend.config import GLIDEPLAN_URL
 
 
 def login_required(f: Callable) -> Callable:
@@ -22,19 +19,17 @@ def login_required(f: Callable) -> Callable:
 
 
 def page_login_required(f: Callable) -> Callable:
-    """Redirect unauthenticated visitors to the main GlidePlan app to log in.
+    """Render GlideLog's own login/registration popup for unauthenticated visitors.
 
-    GlideLog has no login UI of its own, so the login prompt lives on the main
-    app (GLIDEPLAN_URL). We pass the current URL as ?next so the user is sent
-    back here once authenticated. Falls back to a relative redirect only when
-    GLIDEPLAN_URL is unset (single-host/dev deployments).
+    GlideLog now authenticates users itself (shared users table, shared
+    SECRET_KEY) instead of bouncing them to the main GlidePlan app. The login
+    page is served in place at the requested URL so that, after a successful
+    login, the browser can return straight to where the visitor was headed.
     """
     @wraps(f)
     def decorated(*args, **kwargs):
         if not current_user.is_authenticated:
-            next_url = quote(request.url, safe='')
-            base = GLIDEPLAN_URL if GLIDEPLAN_URL else ''
-            return redirect(f'{base}/?login=1&next={next_url}')
+            return render_template('logbook/login.html', next_url=request.url), 401
         return f(*args, **kwargs)
     return decorated
 

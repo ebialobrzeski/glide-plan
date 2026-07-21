@@ -1,4 +1,9 @@
-"""Authentication and user-registration service."""
+"""Authentication and user-registration service.
+
+Ported from the main GlidePlan app so GlideLog can register, log in and verify
+users directly against the shared `users` table (same schema, same SECRET_KEY),
+instead of bouncing visitors to GlidePlan to authenticate.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -82,7 +87,8 @@ def register_user(db: Session, email: str, display_name: str, password: str) -> 
     )
     db.add(user)
     db.flush()  # get the id without committing yet
-    logger.info('Registered new user: %s (id=%s)', email, user.id)
+    # Log the server-generated id only — never the email (PII) in clear text.
+    logger.info('Registered new user id=%s', user.id)
     return user
 
 
@@ -124,7 +130,7 @@ def verify_email_code(db: Session, user: User, code: str) -> None:
     user.verification_attempts = 0
     user.last_login_at = datetime.now(timezone.utc)
     db.flush()
-    logger.info('Email verified for user: %s', user.email)
+    logger.info('Email verified for user id=%s', user.id)
 
 
 def authenticate(db: Session, email: str, password: str) -> Optional[User]:
@@ -142,7 +148,7 @@ def authenticate(db: Session, email: str, password: str) -> Optional[User]:
 
     user.last_login_at = datetime.now(timezone.utc)
     db.flush()
-    logger.info('Authenticated user: %s', email)
+    logger.info('Authenticated user id=%s', user.id)
     return user
 
 
@@ -153,7 +159,7 @@ def change_password(db: Session, user: User, old_password: str, new_password: st
     _validate_password(new_password)
     user.password_hash = generate_password_hash(new_password)
     db.flush()
-    logger.info('Password changed for user: %s', user.email)
+    logger.info('Password changed for user id=%s', user.id)
 
 
 def get_user_by_id(db: Session, user_id: str) -> Optional[User]:

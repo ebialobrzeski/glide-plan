@@ -90,7 +90,8 @@ def _generate_and_cache(user_id: uuid.UUID, language: str = 'pl') -> None:
         logger.info('fun_stats: starting generation for user %s (lang=%s)', user_id, language)
         stats = fun_stats_svc.collect_pilot_stats(db, user_id)
         logger.info('fun_stats: collected pilot stats for user %s: %d flights', user_id, stats.get('total_flights', 0))
-        result, model = fun_stats_svc.generate_fun_stats(stats, language)
+        api_key = fun_stats_svc.resolve_api_key(db, user_id)
+        result, model = fun_stats_svc.generate_fun_stats(stats, language, api_key=api_key)
         if result:
             fun_stats_svc.upsert_cache(db, user_id, result, model)
             logger.info('fun_stats: cached %d stats via model %s for user %s', len(result), model, user_id)

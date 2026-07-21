@@ -3,9 +3,10 @@ Flask web application for GlideLog — the standalone flight logbook.
 
 GlideLog runs as its own container/service but shares the GlidePlan
 PostgreSQL database (users, languages, translations, logbook tables) and the
-login session cookie (signed with the same SECRET_KEY). It exposes no auth UI
-of its own: unauthenticated visitors are bounced to the main GlidePlan app to
-log in, then return here with a valid session cookie.
+login session cookie (signed with the same SECRET_KEY). It has its own
+login/registration popup and authenticates users directly against the shared
+users table, so visitors are never bounced to the main GlidePlan app to log in.
+A session created here is identical to one created by GlidePlan.
 """
 import io
 import os
@@ -14,7 +15,7 @@ import logging
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, jsonify, redirect, request
+from flask import Flask, jsonify, redirect, render_template, request
 from flask_cors import CORS
 from flask_login import LoginManager
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -26,6 +27,7 @@ from backend.db import init_db, get_db
 # class is known to the shared Base before any query runs.
 import backend.models  # noqa: F401
 from backend.models.user import User
+from backend.routes.auth import auth_bp
 from backend.routes.logbook import logbook_bp
 from backend.routes.i18n import i18n_bp
 
@@ -76,13 +78,10 @@ def load_user(user_id: str):
 
 @login_manager.unauthorized_handler
 def unauthorized():
-    """API routes get 401 JSON; page routes redirect to the main app's login."""
+    """API routes get 401 JSON; page routes render GlideLog's own login popup."""
     if request.path.startswith('/api/') or request.headers.get('Accept', '').startswith('application/json'):
         return jsonify({'error': 'Authentication required.'}), 401
-    from urllib.parse import quote
-    next_url = quote(request.url, safe='')
-    base = GLIDEPLAN_URL if GLIDEPLAN_URL else ''
-    return redirect(f'{base}/?login=1&next={next_url}')
+    return render_template('logbook/login.html', next_url=request.url), 401
 
 
 # ── Template context — expose the main app URL for cross-app links ────────────
@@ -92,6 +91,7 @@ def inject_glideplan_url():
 
 
 # ── Blueprints ───────────────────────────────────────────────────────────────
+app.register_blueprint(auth_bp)
 app.register_blueprint(logbook_bp)
 app.register_blueprint(i18n_bp)
 

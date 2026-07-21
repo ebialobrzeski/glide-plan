@@ -9,10 +9,12 @@ but shares the GlidePlan PostgreSQL database and login session.
   logbook tables and `users`/`languages` columns are created by migrations
   `026`–`037`, which live here *and* in the main app against a common
   `schema_migrations` ledger, so applying them is idempotent.
-- **Authentication** — GlideLog has **no login UI of its own**. It reads the
-  Flask session cookie set by the main app, which works because both services
-  are configured with the **same `SECRET_KEY`**. Unauthenticated visitors are
-  redirected to `GLIDEPLAN_URL` to log in, then returned here.
+- **Authentication** — GlideLog has **its own login/registration popup** and
+  authenticates users directly against the shared `users` table (same schema,
+  same `SECRET_KEY`, same email-verification flow as GlidePlan). Visitors are
+  no longer redirected to `GLIDEPLAN_URL` to log in. A session created here is
+  interchangeable with one created by GlidePlan, since both sign the cookie
+  with the same key.
 - **i18n** — GlideLog serves its own `/api/i18n/*` endpoints (backed by the
   shared `languages`/`translations` tables) so the UI translates without
   depending on the main app being reachable from the browser.
@@ -23,7 +25,8 @@ but shares the GlidePlan PostgreSQL database and login session.
 | --- | --- |
 | `SECRET_KEY` | **Must match GlidePlan** — signs the shared session cookie. |
 | `DATABASE_URL` | Points at the shared PostgreSQL database. |
-| `GLIDEPLAN_URL` | Public URL of the main app for login/logout links. |
+| `GLIDEPLAN_URL` | Public URL of the main app, for cross-app navigation links only ("Back to GlidePlan"). |
+| `RESEND_API_KEY` / `RESEND_FROM_ADDRESS` | Resend config for sending account-verification codes (share with GlidePlan). |
 | `SESSION_COOKIE_DOMAIN` | Set to a shared parent domain (e.g. `.glideplan.org`) only when the two apps are on different subdomains. |
 | `GLIDELOG_SCHEDULER_ENABLED` | `0` to disable the daily background flight sync. |
 
@@ -36,8 +39,8 @@ docker compose up --build glidelog
 ```
 
 GlideLog is then available at <http://localhost:5001> (redirects to
-`/logbook/dashboard`). Log in through the main app at
-<http://localhost:5000> first so the shared session cookie is set.
+`/logbook/dashboard`). Unauthenticated visitors get GlideLog's own
+login/registration popup — no need to visit the main app first.
 
 Locally without Docker:
 

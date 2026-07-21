@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import OPENROUTER_API_KEY
 from backend.models.flight import Flight
+from backend.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +220,33 @@ def _parse_json_response(text: str) -> list:
     cleaned = cleaned.strip()
     data = json.loads(cleaned)
     return data['stats']
+
+
+# ---------------------------------------------------------------------------
+# API key resolution
+# ---------------------------------------------------------------------------
+
+def resolve_api_key(db: Session, user_id: uuid.UUID) -> Optional[str]:
+    """Return the OpenRouter API key to use for a user's fun-stats generation.
+
+    Preference order:
+    1. The user's own key, stored encrypted in the shared users table
+       (openrouter_key_enc) — this is where the key now lives after being
+       moved out of environment configuration into the database.
+    2. The app-level OPENROUTER_API_KEY env var, kept only as a legacy fallback.
+
+    Returns None if neither is available.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is not None and user.openrouter_key_enc:
+        try:
+            from backend.utils.crypto import decrypt_value
+            key = decrypt_value(user.openrouter_key_enc)
+            if key:
+                return key
+        except Exception:
+            logger.warning('fun_stats: failed to decrypt stored OpenRouter key for user %s', user_id, exc_info=True)
+    return OPENROUTER_API_KEY or None
 
 
 # ---------------------------------------------------------------------------

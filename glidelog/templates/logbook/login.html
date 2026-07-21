@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log in — GlideLog</title>
+    <link rel="icon" href="/static/images/favicon.ico" sizes="any">
+    <link rel="icon" href="/static/images/icon-192.png" type="image/png" sizes="192x192">
+    <link rel="apple-touch-icon" href="/static/images/apple-touch-icon.png">
+
+    <!-- Shoelace Web Components — same CDN as the rest of the app -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/themes/light.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/themes/dark.css" />
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/shoelace-autoloader.js"></script>
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
+
+    <!-- i18n -->
+    <script src="/static/js/i18n.js"></script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --gl-primary:  #2563eb;
+            --gl-primary-h:#1d4ed8;
+            --text-secondary: #94a3b8;
+        }
+        html.sl-theme-dark { color-scheme: dark; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background:
+                radial-gradient(1200px 600px at 50% -10%, rgba(37,99,235,.22), transparent 60%),
+                #0f172a;
+            color: #e2e8f0;
+        }
+        .login-hero {
+            text-align: center;
+            max-width: 420px;
+            width: 100%;
+        }
+        .login-logo {
+            width: 72px;
+            height: 72px;
+            border-radius: 16px;
+            object-fit: contain;
+            margin-bottom: 18px;
+            box-shadow: 0 8px 30px rgba(0,0,0,.35);
+        }
+        .login-appname {
+            font-size: 1.9rem;
+            font-weight: 800;
+            letter-spacing: -.02em;
+            color: #fff;
+        }
+        .login-appname span { color: #60a5fa; }
+        .login-subtitle {
+            color: var(--text-secondary);
+            margin-top: 6px;
+            font-size: .95rem;
+        }
+        .login-actions {
+            margin-top: 26px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .login-foot {
+            margin-top: 22px;
+            font-size: .8rem;
+            color: rgba(148,163,184,.7);
+        }
+        .form-group { margin-bottom: 16px; text-align: left; }
+        .form-group label {
+            display: block;
+            font-size: .82rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--sl-color-neutral-700);
+        }
+        .auth-error { color: var(--sl-color-danger-600); margin-bottom: 12px; font-size: .875rem; }
+        .switch-line {
+            margin-top: 16px;
+            text-align: center;
+            font-size: .85rem;
+            color: var(--sl-color-neutral-600);
+        }
+        .switch-line a { color: var(--gl-primary); text-decoration: none; }
+        .switch-line a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="login-hero">
+        <img src="/static/images/logo.png" alt="GlideLog" class="login-logo">
+        <div class="login-appname">Glide<span>Log</span></div>
+        <div class="login-subtitle" data-i18n="logbook.brand.subtitle">Flight Logbook</div>
+        <div class="login-actions">
+            <sl-button id="auth-login-btn" variant="primary" size="medium">
+                <i class="fas fa-sign-in-alt" slot="prefix"></i> <span data-i18n="header.login">Log in</span>
+            </sl-button>
+            <sl-button id="auth-register-btn" variant="default" size="medium">
+                <i class="fas fa-user-plus" slot="prefix"></i> <span data-i18n="header.signup">Sign up</span>
+            </sl-button>
+        </div>
+        <div class="login-foot">GlidePlan · GlideLog</div>
+    </div>
+
+    <!-- Login Dialog -->
+    <sl-dialog id="login-dialog" label="Log in to GlideLog" data-i18n-label="dlg.login_title" style="--width: 420px;">
+        <form id="login-form" autocomplete="on">
+            <div class="form-group">
+                <label for="login-email" data-i18n="form.email">Email</label>
+                <sl-input id="login-email" name="email" type="email" autocomplete="email" required placeholder="you@example.com" size="medium">
+                    <i class="fas fa-envelope" slot="prefix"></i>
+                </sl-input>
+            </div>
+            <div class="form-group">
+                <label for="login-password" data-i18n="form.password">Password</label>
+                <sl-input id="login-password" name="password" type="password" autocomplete="current-password" required placeholder="Password" size="medium" password-toggle>
+                    <i class="fas fa-lock" slot="prefix"></i>
+                </sl-input>
+            </div>
+            <div id="login-error" class="auth-error" style="display:none;"></div>
+            <sl-button id="login-submit-btn" type="submit" variant="primary" style="width:100%;">
+                <i class="fas fa-sign-in-alt" slot="prefix"></i> <span data-i18n="header.login">Log in</span>
+            </sl-button>
+        </form>
+        <p class="switch-line">
+            <span data-i18n="auth.no_account">Don't have an account?</span>
+            <a href="#" id="switch-to-register"><span data-i18n="header.signup">Sign up</span></a>
+        </p>
+    </sl-dialog>
+
+    <!-- Register Dialog -->
+    <sl-dialog id="register-dialog" label="Create Account" data-i18n-label="dlg.register_title" style="--width: 460px;">
+        <form id="register-form" autocomplete="on">
+            <div class="form-group">
+                <label for="register-email" data-i18n="form.email">Email</label>
+                <sl-input id="register-email" name="email" type="email" autocomplete="email" required placeholder="you@example.com" size="medium">
+                    <i class="fas fa-envelope" slot="prefix"></i>
+                </sl-input>
+            </div>
+            <div class="form-group">
+                <label for="register-display-name" data-i18n="form.display_name">Display Name</label>
+                <sl-input id="register-display-name" name="display_name" type="text" autocomplete="name" required placeholder="Jan Kowalski" size="medium">
+                    <i class="fas fa-user" slot="prefix"></i>
+                </sl-input>
+            </div>
+            <div class="form-group">
+                <label for="register-password"><span data-i18n="form.password">Password</span> <small style="color:var(--text-secondary);"><span data-i18n="form.password_hint">(min 8 chars)</span></small></label>
+                <sl-input id="register-password" name="password" type="password" autocomplete="new-password" required placeholder="Password (min 8 chars)" size="medium" password-toggle>
+                    <i class="fas fa-lock" slot="prefix"></i>
+                </sl-input>
+            </div>
+            <div class="form-group">
+                <label for="register-confirm-password" data-i18n="form.confirm_password">Confirm Password</label>
+                <sl-input id="register-confirm-password" name="confirm_password" type="password" autocomplete="new-password" required placeholder="Repeat password" size="medium" password-toggle>
+                    <i class="fas fa-lock" slot="prefix"></i>
+                </sl-input>
+            </div>
+            <div id="register-error" class="auth-error" style="display:none;"></div>
+            <sl-button id="register-submit-btn" type="submit" variant="primary" style="width:100%;">
+                <i class="fas fa-user-plus" slot="prefix"></i> <span data-i18n="dlg.register_title">Create Account</span>
+            </sl-button>
+        </form>
+        <p class="switch-line">
+            <span data-i18n="auth.have_account">Already have an account?</span>
+            <a href="#" id="switch-to-login"><span data-i18n="header.login">Log in</span></a>
+        </p>
+    </sl-dialog>
+
+    <!-- Verify Email Dialog -->
+    <sl-dialog id="verify-email-dialog" label="Verify your email" data-i18n-label="dlg.verify_title" style="--width: 420px;">
+        <p style="margin-bottom:16px; color:var(--sl-color-neutral-600);">
+            <span data-i18n="auth.verify_sent">We sent a 6-digit code to</span>
+            <strong id="verify-email-addr"></strong>.
+        </p>
+        <div class="form-group">
+            <label for="verify-code-input" data-i18n="auth.verify_enter">Enter the 6-digit code</label>
+            <sl-input id="verify-code-input" type="text" inputmode="numeric" maxlength="6"
+                      placeholder="000000" size="medium" autocomplete="one-time-code">
+                <i class="fas fa-key" slot="prefix"></i>
+            </sl-input>
+        </div>
+        <div id="verify-error" class="auth-error" style="display:none;"></div>
+        <sl-button id="verify-submit-btn" variant="primary" style="width:100%;">
+            <i class="fas fa-check-circle" slot="prefix"></i> <span data-i18n="auth.verify_btn">Verify</span>
+        </sl-button>
+        <p class="switch-line">
+            <a href="#" id="verify-resend-link" data-i18n="auth.resend_code">Resend code</a>
+        </p>
+    </sl-dialog>
+
+    <script>
+        // Theme: match the rest of GlideLog (dark by default).
+        (function () {
+            const saved = localStorage.getItem('glideplan-theme');
+            if (saved !== 'light') document.documentElement.classList.add('sl-theme-dark');
+        })();
+        // Where to send the browser after a successful login.
+        window.GLIDELOG_NEXT_URL = {{ next_url | tojson }};
+    </script>
+    <script src="/static/js/auth.js"></script>
+</body>
+</html>
