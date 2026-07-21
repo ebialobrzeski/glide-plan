@@ -20,7 +20,14 @@ logger = logging.getLogger(__name__)
 
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Only free models — zero cost to the service operator.
+# Preferred model — a stronger, more creative model than the free tier. Fun
+# stats now run on the user's own OpenRouter key, so the (small) cost is theirs
+# and it is worth a noticeably better result. If this call fails (no credit,
+# provider down, …) we transparently fall back to the free models below.
+_PRIMARY_FUN_STATS_MODEL = "deepseek/deepseek-chat"
+
+# Free fallback models — zero cost, used only when the preferred model is
+# unavailable so fun stats keep working even without paid credit.
 # `openrouter/free` is a meta-model: OR auto-selects from available free providers.
 # The explicit list is the fallback chain if the meta-model itself is unavailable.
 # Many Venice-hosted models return 429; prefer non-Venice providers (openai/gpt-oss-*,
@@ -261,8 +268,9 @@ def generate_fun_stats(
     """Generate humorous stats via OpenRouter. Returns (stats_list, model_used).
 
     Strategy:
-    1. Try openrouter/free (meta-model, OR auto-selects an available free provider).
-    2. On failure, try the explicit model list with OR's route:fallback in one request.
+    1. Try the preferred creative model (paid — the user's own key).
+    2. On failure, try openrouter/free (meta-model, OR auto-selects a free provider).
+    3. On failure, try the explicit free model list with OR's route:fallback.
     Returns ([], '') on total failure.
     """
     key = api_key or OPENROUTER_API_KEY
@@ -296,7 +304,19 @@ def generate_fun_stats(
         logger.info('fun_stats: generated via %s', model_used)
         return result, short_model
 
-    # Attempt 1: openrouter/free meta-model
+    # Attempt 1: preferred creative model (paid — uses the user's own key)
+    try:
+        return _call({
+            'model':       _PRIMARY_FUN_STATS_MODEL,
+            'messages':    [{'role': 'user', 'content': prompt}],
+            'temperature': 0.9,
+            'max_tokens':  2048,
+        })
+    except Exception:
+        logger.warning('fun_stats: preferred model %s failed, falling back to free models',
+                       _PRIMARY_FUN_STATS_MODEL, exc_info=True)
+
+    # Attempt 2: openrouter/free meta-model
     try:
         return _call({
             'model':       'openrouter/free',
@@ -307,7 +327,7 @@ def generate_fun_stats(
     except Exception:
         logger.warning('fun_stats: openrouter/free failed, trying explicit model list', exc_info=True)
 
-    # Attempt 2: explicit free model list with OR fallback routing
+    # Attempt 3: explicit free model list with OR fallback routing
     explicit_models = _FUN_STATS_MODELS[1:]  # skip openrouter/free
     try:
         return _call({
