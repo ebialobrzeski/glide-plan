@@ -168,19 +168,25 @@ file_handler = RotatingFileHandler('logs/glidelog.log', maxBytes=10485760, backu
 file_handler.setFormatter(logging.Formatter(
     '%(asctime)s %(levelname)s [%(name)s] %(message)s [%(pathname)s:%(lineno)d]'
 ))
-if app.debug:
-    file_handler.setLevel(logging.DEBUG)
-    _console = logging.StreamHandler()
-    _console.setFormatter(logging.Formatter('%(asctime)s %(levelname)s [%(name)s] %(message)s'))
-    _console.setLevel(logging.DEBUG)
-    logging.getLogger('backend').addHandler(_console)
-    logging.getLogger('backend').setLevel(logging.DEBUG)
-else:
-    file_handler.setLevel(logging.INFO)
+_level = logging.DEBUG if app.debug else logging.INFO
+file_handler.setLevel(_level)
+
+# Always stream to stdout so `docker logs` / gunicorn surface application logs —
+# including background sync errors. Previously the console handler was only
+# attached in debug mode, so in production (FLASK_DEBUG=0) tracebacks went only
+# to logs/glidelog.log inside the container and never appeared in container logs.
+_console = logging.StreamHandler()
+_console.setFormatter(logging.Formatter('%(asctime)s %(levelname)s [%(name)s] %(message)s'))
+_console.setLevel(_level)
+
+_backend_logger = logging.getLogger('backend')
+_backend_logger.addHandler(file_handler)
+_backend_logger.addHandler(_console)
+_backend_logger.setLevel(_level)
 
 app.logger.addHandler(file_handler)
-app.logger.setLevel(logging.DEBUG if app.debug else logging.INFO)
-logging.getLogger('backend').addHandler(file_handler)
+app.logger.addHandler(_console)
+app.logger.setLevel(_level)
 
 app.logger.info('GlideLog startup (debug=%s)', app.debug)
 

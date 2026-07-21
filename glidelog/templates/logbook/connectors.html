@@ -58,6 +58,12 @@ function _t(key, fallback) {
     return window.i18n ? window.i18n.t(key, fallback) : (fallback || key);
 }
 
+function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+
 async function loadConnectors() {
     const resp = await fetch('/logbook/api/connectors');
     const list = await resp.json();
@@ -86,6 +92,7 @@ async function loadConnectors() {
                 ${_t('logbook.connectors.last_sync', 'Last sync:')} ${c.last_sync_at ? c.last_sync_at.slice(0,16).replace('T',' ') : '—'}
                 ${c.last_sync_status ? `<span class="badge badge-${c.last_sync_status === 'success' ? 'success' : 'danger'}">${c.last_sync_status}</span>` : ''}
             </div>
+            ${c.last_sync_status === 'error' && c.last_sync_message ? `<div style="margin-top:6px;font-size:0.8rem;color:var(--gl-danger,#e5484d);word-break:break-word">${escapeHtml(c.last_sync_message)}</div>` : ''}
         </div>
     `).join('');
 }

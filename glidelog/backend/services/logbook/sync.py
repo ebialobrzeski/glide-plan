@@ -83,7 +83,11 @@ def sync_connector(db: Session, connector: Connector) -> SyncLog:
             )
             result = db.execute(stmt)
             row = result.first()
-            if row is not None and row.inserted:
+            # Access positionally: this is an ORM insert() executed through a
+            # Session, and the anonymous text() column is NOT exposed as a Row
+            # attribute — `row.inserted` raises AttributeError('inserted'), which
+            # previously aborted the whole sync and rolled back every insert.
+            if row is not None and row[0]:
                 imported += 1
 
         finished_at = datetime.now(timezone.utc)

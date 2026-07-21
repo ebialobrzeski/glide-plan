@@ -129,23 +129,26 @@ file_handler.setFormatter(_log_fmt)
 
 # In debug mode: file at DEBUG, console at DEBUG for backend module
 # In production:  file at INFO
-if app.debug:
-    file_handler.setLevel(logging.DEBUG)
-    # Also add a console handler for the backend module so logs appear in terminal
-    _console = logging.StreamHandler()
-    _console.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s [%(name)s] %(message)s'
-    ))
-    _console.setLevel(logging.DEBUG)
-    logging.getLogger('backend').addHandler(_console)
-    logging.getLogger('backend').setLevel(logging.DEBUG)
-else:
-    file_handler.setLevel(logging.INFO)
+_level = logging.DEBUG if app.debug else logging.INFO
+file_handler.setLevel(_level)
 
-# Attach file handler to both Flask app logger and backend module logger
+# Always stream to stdout so `docker logs` / gunicorn surface application logs in
+# production too. Previously the console handler was only attached in debug mode.
+_console = logging.StreamHandler()
+_console.setFormatter(logging.Formatter(
+    '%(asctime)s %(levelname)s [%(name)s] %(message)s'
+))
+_console.setLevel(_level)
+
+# Attach both handlers to the Flask app logger and backend module logger
+_backend_logger = logging.getLogger('backend')
+_backend_logger.addHandler(file_handler)
+_backend_logger.addHandler(_console)
+_backend_logger.setLevel(_level)
+
 app.logger.addHandler(file_handler)
-app.logger.setLevel(logging.DEBUG if app.debug else logging.INFO)
-logging.getLogger('backend').addHandler(file_handler)
+app.logger.addHandler(_console)
+app.logger.setLevel(_level)
 
 app.logger.info('GlidePlan startup (debug=%s)', app.debug)
 
