@@ -59,8 +59,13 @@ services:
       # MUST match glideplan's SECRET_KEY so the login session cookie is shared
       - SECRET_KEY=${SECRET_KEY:-change_this_secret_key_in_production}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-glideplan}:${POSTGRES_PASSWORD:-changeme_secure_password}@postgres_gliding:5432/${POSTGRES_DB:-gliding_forecast}
-      # Public URL of the main GlidePlan app — used for login/logout links
+      # Public URL of the main GlidePlan app — used for cross-app links only
+      # (e.g. "Back to GlidePlan"). GlideLog authenticates users itself.
       - GLIDEPLAN_URL=${GLIDEPLAN_URL:-http://localhost:5000}
+      # Email delivery for account verification codes — GlideLog now runs its
+      # own registration flow, so it needs the same Resend config as GlidePlan.
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - RESEND_FROM_ADDRESS=${RESEND_FROM_ADDRESS:-noreply@glideplan.org}
       # Set to a shared parent domain (e.g. .glideplan.org) when the two apps
       # live on different subdomains; leave empty for same-host deployments.
       - SESSION_COOKIE_DOMAIN=${SESSION_COOKIE_DOMAIN:-}

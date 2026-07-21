@@ -4,7 +4,6 @@ from datetime import date
 from flask import redirect, render_template, request, url_for
 from flask_login import current_user, logout_user
 
-from backend.config import GLIDEPLAN_URL
 from backend.db import get_db
 from backend.models.flight import Flight
 from backend.routes.logbook import logbook_bp
@@ -15,15 +14,15 @@ from backend.utils.auth_decorators import page_login_required as login_required
 
 @logbook_bp.route('/logout', methods=['GET'])
 def logout():
-    """Log the user out of the shared session and return to the main app.
+    """Log the user out of the shared session and return to GlideLog's login page.
 
     GlideLog shares the login cookie with GlidePlan, so clearing the session
     here (via the common SECRET_KEY / cookie domain) logs the user out of both.
-    The main app's own /auth/logout is a POST-only API endpoint, so a plain
-    link there would 405 — this GET route is what the templates point to.
+    After logout we send the visitor to the dashboard, which — now
+    unauthenticated — renders GlideLog's own login popup.
     """
     logout_user()
-    return redirect(GLIDEPLAN_URL or '/')
+    return redirect(url_for('logbook.dashboard'))
 
 
 def _current_season_year() -> int:

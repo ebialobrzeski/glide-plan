@@ -185,7 +185,8 @@ def _trigger_fun_stats_regen(user_id, connector: Connector) -> None:
             user = db.query(User).get(user_id)
             language = (user.preferred_language if user else None) or 'pl'
             stats = fun_stats_svc.collect_pilot_stats(db, user_id)
-            result, model = fun_stats_svc.generate_fun_stats(stats, language)
+            api_key = fun_stats_svc.resolve_api_key(db, user_id)
+            result, model = fun_stats_svc.generate_fun_stats(stats, language, api_key=api_key)
             if result:
                 fun_stats_svc.upsert_cache(db, user_id, result, model)
         except Exception:

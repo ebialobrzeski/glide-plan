@@ -40,9 +40,9 @@ RESEND_FROM_ADDRESS: str  = os.environ.get('RESEND_FROM_ADDRESS', 'noreply@glide
 
 # GlideLog
 GLIDELOG_SCHEDULER_ENABLED: bool = os.environ.get('GLIDELOG_SCHEDULER_ENABLED', '1').lower() in ('1', 'true', 'yes')
-# URL of the main GlidePlan app — used for cross-app auth links (login/logout,
-# "Back to GlidePlan"). GlideLog has no auth UI of its own; it shares the login
-# session with GlidePlan via a common SECRET_KEY and session cookie.
+# URL of the main GlidePlan app — used only for cross-app navigation links
+# (e.g. "Back to GlidePlan"). GlideLog has its own login/registration popup and
+# shares the login session with GlidePlan via a common SECRET_KEY and cookie.
 GLIDEPLAN_URL: str = os.environ.get('GLIDEPLAN_URL', '').rstrip('/')
 # Session cookie domain — set to a shared parent domain (e.g. .glideplan.org)
 # when the two apps live on different subdomains. Leave empty for same-host /
