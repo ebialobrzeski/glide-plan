@@ -22,7 +22,21 @@ logger = logging.getLogger(__name__)
 def list_connectors():
     db = get_db()
     connectors = db.query(Connector).filter(Connector.user_id == current_user.id).all()
-    return jsonify([c.to_dict(include_credentials=True) for c in connectors])
+    out = []
+    for c in connectors:
+        d = c.to_dict(include_credentials=True)
+        # Surface the last error message so the UI can show *why* a sync failed,
+        # instead of just an "error" badge with no detail.
+        if c.last_sync_status == 'error':
+            last = (
+                db.query(SyncLog)
+                .filter(SyncLog.connector_id == c.id)
+                .order_by(SyncLog.started_at.desc())
+                .first()
+            )
+            d['last_sync_message'] = last.message if last else None
+        out.append(d)
+    return jsonify(out)
 
 
 @logbook_bp.route('/api/connectors', methods=['POST'])
