@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import re
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -20,8 +19,6 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from backend.models.user import User
 
 logger = logging.getLogger(__name__)
-
-_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
 
 class AuthError(Exception):
@@ -40,7 +37,20 @@ _MAX_VERIFY_ATTEMPTS = 3
 
 def _validate_email(email: str) -> str:
     email = email.strip().lower()
-    if not _EMAIL_RE.match(email):
+    # Structural, linear-time validation. A regex like
+    # ^[^@\s]+@[^@\s]+\.[^@\s]+$ backtracks catastrophically (ReDoS) on hostile
+    # input, so validate by splitting instead — no regex, no backtracking.
+    local, sep, domain = email.partition('@')
+    if (
+        not sep
+        or not local
+        or not domain
+        or '@' in domain
+        or '.' not in domain
+        or domain.startswith('.')
+        or domain.endswith('.')
+        or any(ch.isspace() for ch in email)
+    ):
         raise AuthError('Invalid email address.')
     return email
 

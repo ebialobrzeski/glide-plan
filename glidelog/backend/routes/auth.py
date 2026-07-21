@@ -23,6 +23,31 @@ logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
+# The auth service raises AuthError with these fixed, human-readable messages
+# (or frontend-mapped codes). Echoing a caught exception's text straight back to
+# the client risks leaking internal detail (CWE-209), so we only ever return a
+# value drawn from this allow-list — the returned string comes from the constant
+# set, never from the exception object.
+_SAFE_AUTH_ERRORS = frozenset({
+    'Invalid email address.',
+    'Password must be at least 8 characters.',
+    'Display name must be between 2 and 100 characters.',
+    'An account with that email already exists.',
+    'Current password is incorrect.',
+    'code_invalid',
+    'code_expired',
+    'too_many_attempts',
+})
+
+
+def _safe_auth_error(exc: AuthError, default: str) -> str:
+    """Return the exception's message only if it is a known-safe value."""
+    text = str(exc)
+    for known in _SAFE_AUTH_ERRORS:
+        if text == known:
+            return known
+    return default
+
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
@@ -43,7 +68,7 @@ def register():
         return jsonify({'requires_verification': True, 'email': user.email}), 201
     except AuthError as exc:
         db.rollback()
-        return jsonify({'error': str(exc)}), 409
+        return jsonify({'error': _safe_auth_error(exc, 'Registration failed.')}), 409
     except Exception:
         db.rollback()
         logger.exception('Unexpected error during registration')
@@ -105,7 +130,7 @@ def verify_email():
         return jsonify({'user': user.to_dict(), 'limits': limits})
     except AuthError as exc:
         db.commit()  # persist attempt count increment
-        return jsonify({'error': str(exc)}), 400
+        return jsonify({'error': _safe_auth_error(exc, 'code_invalid')}), 400
     except Exception:
         db.rollback()
         logger.exception('Unexpected error during email verification')
