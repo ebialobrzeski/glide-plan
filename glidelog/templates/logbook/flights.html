@@ -52,6 +52,7 @@
                     <th data-i18n="logbook.flights.registration">Registration</th>
                     <th data-i18n="logbook.tbl.takeoff">Take-off</th>
                     <th data-i18n="logbook.tbl.landing">Landing</th>
+                    <th data-i18n="logbook.tbl.landings">Landings</th>
                     <th data-i18n="logbook.flights.duration_min">Duration (min)</th>
                     <th data-i18n="logbook.tbl.task">Task</th>
                     <th data-i18n="logbook.tbl.launch">Launch</th>
@@ -60,7 +61,7 @@
                 </tr>
             </thead>
             <tbody id="flightsBody">
-                <tr><td colspan="10" class="loading"><i class="fa fa-spinner fa-spin"></i> <span data-i18n="logbook.flights.loading">Loading…</span></td></tr>
+                <tr><td colspan="11" class="loading"><i class="fa fa-spinner fa-spin"></i> <span data-i18n="logbook.flights.loading">Loading…</span></td></tr>
             </tbody>
         </table>
     </div>
@@ -167,7 +168,7 @@ async function loadFlights(page = 1) {
     currentPage = page;
     const tbody = document.getElementById('flightsBody');
     const loadingMsg = window.i18n ? window.i18n.t('logbook.flights.loading', 'Loading…') : 'Loading…';
-    tbody.innerHTML = `<tr><td colspan="10" class="loading"><i class="fa fa-spinner fa-spin"></i> ${loadingMsg}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="loading"><i class="fa fa-spinner fa-spin"></i> ${loadingMsg}</td></tr>`;
 
     const resp = await fetch('/logbook/api/flights?' + buildParams(page));
     const data = await resp.json();
@@ -175,7 +176,7 @@ async function loadFlights(page = 1) {
 
     if (!data.flights || data.flights.length === 0) {
         const noFlights = window.i18n ? window.i18n.t('logbook.empty.no_flights', 'No flights recorded') : 'No flights recorded';
-        tbody.innerHTML = `<tr><td colspan="10" class="empty">${noFlights}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="empty">${noFlights}</td></tr>`;
     } else {
         tbody.innerHTML = data.flights.map(f => `
             <tr>
@@ -184,6 +185,7 @@ async function loadFlights(page = 1) {
                 <td>${f.aircraft_reg || ''}</td>
                 <td>${f.takeoff_airport || ''} ${f.takeoff_time || ''}</td>
                 <td>${f.landing_airport || ''} ${f.landing_time || ''}</td>
+                <td>${f.landings ?? ''}</td>
                 <td>${f.flight_time_min ?? ''}</td>
                 <td>${f.task || ''}</td>
                 <td><span class="badge badge-info">${f.launch_type || ''}</span></td>
