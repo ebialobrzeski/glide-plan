@@ -30,7 +30,8 @@ def _send(*, to: str, subject: str, html: str) -> Optional[str]:
     (e.g. missing API key in dev/test environments).
     """
     if not RESEND_API_KEY:
-        logger.warning('RESEND_API_KEY is not set — email to %s was not sent.', to)
+        # Never log the recipient address (PII) in clear text.
+        logger.warning('RESEND_API_KEY is not set — transactional email was not sent.')
         return None
 
     try:
@@ -41,10 +42,10 @@ def _send(*, to: str, subject: str, html: str) -> Optional[str]:
             'html': html,
         }
         response = resend.Emails.send(params)
-        logger.info('Email sent to %s (id=%s)', to, response.get('id'))
+        logger.info('Email sent (id=%s)', response.get('id'))
         return response.get('id')
     except Exception:
-        logger.exception('Failed to send email to %s', to)
+        logger.exception('Failed to send transactional email')
         return None
 
 
