@@ -44,136 +44,94 @@ _FUN_STATS_MODELS = [
 ]
 
 
+# Cap on how many individual flight rows we hand to the model. Enough to give
+# it rich material to mine for patterns while staying comfortably inside the
+# context window of the free fallback models. When a pilot has more flights we
+# send the most recent ones and tell the model the true total.
+_MAX_FLIGHTS_FOR_PROMPT = 400
+
+
 # ---------------------------------------------------------------------------
-# Stats collection
+# Raw data collection
 # ---------------------------------------------------------------------------
 
-def collect_pilot_stats(db: Session, user_id: uuid.UUID) -> dict:
-    """Collect aggregate flight statistics for a pilot from the database."""
+def collect_raw_flights(
+    db: Session,
+    user_id: uuid.UUID,
+    limit: int = _MAX_FLIGHTS_FOR_PROMPT,
+) -> dict:
+    """Collect raw per-flight data for a pilot to hand to the LLM.
 
-    base_q = db.query(Flight).filter(Flight.user_id == user_id)
+    Instead of pre-computing a fixed set of aggregates, we pull the raw flight
+    log (most recent ``limit`` flights) plus a couple of headline totals for
+    context, and let the model decide for itself which patterns are worth
+    turning into fun stats. Returns a dict with:
 
-    # Basic aggregates
-    agg = db.query(
+    - ``total_flights`` — the pilot's true total flight count
+    - ``included``      — how many flight rows are in ``flights`` (<= total)
+    - ``totals``        — a few cheap aggregates for scale/context
+    - ``flights``       — list of compact per-flight dicts, newest first
+    """
+    totals_row = db.query(
         func.count(Flight.id).label('total_flights'),
         func.coalesce(func.sum(Flight.flight_time_min), 0).label('total_minutes'),
         func.coalesce(func.sum(Flight.price), 0).label('total_cost'),
-        func.max(Flight.flight_time_min).label('longest_min'),
-        func.min(Flight.flight_time_min).label('shortest_min'),
         func.count(func.distinct(Flight.date)).label('flight_days'),
     ).filter(Flight.user_id == user_id).one()
 
-    total_flights = int(agg.total_flights or 0)
-    total_minutes = int(agg.total_minutes or 0)
+    total_flights = int(totals_row.total_flights or 0)
+    total_minutes = int(totals_row.total_minutes or 0)
 
-    # Date of longest flight
-    longest_row = base_q.filter(
-        Flight.flight_time_min == agg.longest_min,
-        Flight.flight_time_min.isnot(None),
-    ).order_by(Flight.date.asc()).first()
-    longest_date = longest_row.date.isoformat() if longest_row and longest_row.date else '—'
-
-    # Earliest takeoff time ever
-    earliest_row = db.query(
-        func.min(Flight.takeoff_time).label('earliest'),
-    ).filter(Flight.user_id == user_id, Flight.takeoff_time.isnot(None)).one()
-    earliest_takeoff = (
-        earliest_row.earliest.strftime('%H:%M') if earliest_row.earliest else '—'
-    )
-
-    # Busiest day
-    busiest = db.execute(text("""
-        SELECT date, COUNT(*) AS cnt
-        FROM flights
-        WHERE user_id = :uid AND date IS NOT NULL
-        GROUP BY date
-        ORDER BY cnt DESC
-        LIMIT 1
-    """), {'uid': user_id}).fetchone()
-    busiest_day_date = busiest[0].isoformat() if busiest else '—'
-    busiest_day_flights = int(busiest[1]) if busiest else 0
-
-    # Top winch operator (from raw_data JSONB)
-    winch_row = db.execute(text("""
-        SELECT raw_data->'crew'->>'winch_operator' AS operator, COUNT(*) AS cnt
+    rows = db.execute(text("""
+        SELECT date,
+               aircraft_type,
+               aircraft_reg,
+               launch_type,
+               takeoff_airport,
+               landing_airport,
+               to_char(takeoff_time, 'HH24:MI')  AS takeoff,
+               to_char(landing_time, 'HH24:MI')  AS landing,
+               flight_time_min,
+               landings,
+               instructor,
+               task,
+               price,
+               raw_data->'crew'->>'winch_operator' AS winch_operator
         FROM flights
         WHERE user_id = :uid
-          AND raw_data->'crew'->>'winch_operator' IS NOT NULL
-          AND raw_data->'crew'->>'winch_operator' <> ''
-        GROUP BY operator
-        ORDER BY cnt DESC
-        LIMIT 1
-    """), {'uid': user_id}).fetchone()
-    top_winch_operator = winch_row[0] if winch_row else '—'
-    top_winch_count = int(winch_row[1]) if winch_row else 0
+        ORDER BY date DESC NULLS LAST, takeoff_time DESC NULLS LAST
+        LIMIT :lim
+    """), {'uid': user_id, 'lim': limit}).mappings().all()
 
-    # Main instructor (highest flight count with non-null instructor)
-    instructor_row = db.execute(text("""
-        SELECT instructor, COUNT(*) AS cnt
-        FROM flights
-        WHERE user_id = :uid AND instructor IS NOT NULL AND instructor <> ''
-        GROUP BY instructor
-        ORDER BY cnt DESC
-        LIMIT 1
-    """), {'uid': user_id}).fetchone()
-    main_instructor = instructor_row[0] if instructor_row else '—'
-    instructor_flights = int(instructor_row[1]) if instructor_row else 0
-
-    # Total wait time between flights on the same day (minutes)
-    wait_result = db.execute(text("""
-        WITH ordered AS (
-            SELECT date,
-                   takeoff_time,
-                   landing_time,
-                   LAG(landing_time) OVER (PARTITION BY user_id, date ORDER BY takeoff_time) AS prev_landing
-            FROM flights
-            WHERE user_id = :uid
-              AND takeoff_time IS NOT NULL
-              AND landing_time IS NOT NULL
-        )
-        SELECT COALESCE(SUM(
-            EXTRACT(EPOCH FROM (takeoff_time - prev_landing)) / 60
-        ), 0) AS wait_minutes
-        FROM ordered
-        WHERE prev_landing IS NOT NULL
-          AND takeoff_time > prev_landing
-    """), {'uid': user_id}).fetchone()
-    total_wait_minutes = int(wait_result[0] if wait_result else 0)
-    total_wait_hours = round(total_wait_minutes / 60, 1)
-
-    # Longest gap between consecutive flight dates
-    gap_result = db.execute(text("""
-        WITH dates AS (
-            SELECT DISTINCT date FROM flights
-            WHERE user_id = :uid AND date IS NOT NULL
-            ORDER BY date
-        ),
-        gaps AS (
-            SELECT date - LAG(date) OVER (ORDER BY date) AS gap
-            FROM dates
-        )
-        SELECT COALESCE(MAX(gap), 0) AS max_gap FROM gaps
-    """), {'uid': user_id}).fetchone()
-    longest_gap_days = int(gap_result[0] if gap_result else 0)
+    flights = []
+    for r in rows:
+        flights.append({
+            'date':           r['date'].isoformat() if r['date'] else None,
+            'aircraft_type':  r['aircraft_type'],
+            'aircraft_reg':   r['aircraft_reg'],
+            'launch_type':    r['launch_type'],
+            'takeoff_airport': r['takeoff_airport'],
+            'landing_airport': r['landing_airport'],
+            'takeoff_time':   r['takeoff'],
+            'landing_time':   r['landing'],
+            'flight_time_min': r['flight_time_min'],
+            'landings':       r['landings'],
+            'instructor':     r['instructor'],
+            'task':           r['task'],
+            'price':          float(r['price']) if r['price'] is not None else None,
+            'winch_operator': r['winch_operator'],
+        })
 
     return {
-        'total_hours':          total_minutes // 60,
-        'total_minutes':        total_minutes % 60,
-        'total_flights':        total_flights,
-        'total_cost':           float(agg.total_cost or 0),
-        'longest_flight_min':   int(agg.longest_min or 0),
-        'longest_flight_date':  longest_date,
-        'shortest_flight_min':  int(agg.shortest_min or 0),
-        'top_winch_operator':   top_winch_operator,
-        'top_winch_count':      top_winch_count,
-        'main_instructor':      main_instructor,
-        'instructor_flights':   instructor_flights,
-        'earliest_takeoff':     earliest_takeoff,
-        'busiest_day_date':     busiest_day_date,
-        'busiest_day_flights':  busiest_day_flights,
-        'total_wait_hours':     total_wait_hours,
-        'flight_days':          int(agg.flight_days or 0),
-        'longest_gap_days':     longest_gap_days,
+        'total_flights': total_flights,
+        'included':      len(flights),
+        'totals': {
+            'total_hours':   total_minutes // 60,
+            'total_minutes': total_minutes % 60,
+            'total_cost':    float(totals_row.total_cost or 0),
+            'flight_days':   int(totals_row.flight_days or 0),
+        },
+        'flights': flights,
     }
 
 
@@ -181,36 +139,101 @@ def collect_pilot_stats(db: Session, user_id: uuid.UUID) -> dict:
 # Prompt builder
 # ---------------------------------------------------------------------------
 
-def build_fun_stats_prompt(stats: dict, language: str = 'pl') -> str:
+# Columns emitted in the CSV table, in order. Keeping this compact keeps the
+# token count down while still giving the model everything it needs to spot
+# patterns of its own.
+_CSV_COLUMNS = [
+    ('date',            'date'),
+    ('aircraft_type',   'aircraft'),
+    ('aircraft_reg',    'reg'),
+    ('launch_type',     'launch'),
+    ('takeoff_airport', 'from'),
+    ('landing_airport', 'to'),
+    ('takeoff_time',    'takeoff'),
+    ('landing_time',    'landing'),
+    ('flight_time_min', 'mins'),
+    ('landings',        'landings'),
+    ('instructor',      'instructor'),
+    ('task',            'task'),
+    ('price',           'price'),
+    ('winch_operator',  'winch'),
+]
+
+
+def _flights_to_csv(flights: list) -> str:
+    """Render flight dicts as a compact CSV block for the prompt."""
+    def _cell(val) -> str:
+        if val is None:
+            return ''
+        s = str(val)
+        # Escape only what a naive CSV reader would trip on.
+        if any(ch in s for ch in (',', '"', '\n')):
+            s = '"' + s.replace('"', '""') + '"'
+        return s
+
+    header = ','.join(label for _, label in _CSV_COLUMNS)
+    lines = [header]
+    for f in flights:
+        lines.append(','.join(_cell(f.get(key)) for key, _ in _CSV_COLUMNS))
+    return '\n'.join(lines)
+
+
+def build_fun_stats_prompt(data: dict, language: str = 'pl') -> str:
+    """Build the LLM prompt from raw flight data.
+
+    ``data`` is the dict returned by :func:`collect_raw_flights`. We hand the
+    model the raw flight log and let it invent its own stats rather than feeding
+    it pre-chewed aggregates.
+    """
     lang_instruction = {
-        'pl': 'po polsku',
+        'pl': 'in Polish (po polsku)',
         'en': 'in English',
-        'de': 'auf Deutsch',
-        'cs': 'v češtině',
-    }.get(language, 'po polsku')
+        'de': 'in German (auf Deutsch)',
+        'cs': 'in Czech (v češtině)',
+    }.get(language, 'in Polish (po polsku)')
+
+    totals = data.get('totals', {})
+    total_flights = data.get('total_flights', 0)
+    included = data.get('included', 0)
+
+    scope_note = ''
+    if included < total_flights:
+        scope_note = (
+            f"NOTE: this pilot has {total_flights} flights in total; only the "
+            f"{included} most recent are listed below. Treat the totals line as "
+            f"the source of truth for career-wide figures.\n\n"
+        )
+
+    csv_block = _flights_to_csv(data.get('flights', []))
 
     return (
-        f"Jesteś humorystycznym komentatorem lotów szybowcowych.\n"
-        f"Na podstawie poniższych danych pilota wygeneruj dokładnie 8 śmiesznych,\n"
-        f"ciepłych i spersonalizowanych statystyk {lang_instruction}. Każda statystyka powinna\n"
-        f"mieć: tytuł (max 5 słów), wartość liczbową lub frazę, oraz jedno zdanie\n"
-        f"komentarza z humorem. Używaj konkretnych liczb z danych. Bądź ciepły,\n"
-        f"nie złośliwy. Nawiązuj do realiów szybownictwa.\n\n"
-        f"Dane pilota:\n"
-        f"- Łączny nalot: {stats['total_hours']}h {stats['total_minutes']}min\n"
-        f"- Liczba lotów: {stats['total_flights']}\n"
-        f"- Łączny koszt sezonu: {stats['total_cost']} zł\n"
-        f"- Najdłuższy lot: {stats['longest_flight_min']} min ({stats['longest_flight_date']})\n"
-        f"- Najkrótszy lot: {stats['shortest_flight_min']} min\n"
-        f"- Ulubiony wyciągarkowy: {stats['top_winch_operator']} ({stats['top_winch_count']} startów)\n"
-        f"- Główny instruktor: {stats['main_instructor']} ({stats['instructor_flights']} lotów)\n"
-        f"- Najwcześniejszy start: {stats['earliest_takeoff']}\n"
-        f"- Najpracowszy dzień: {stats['busiest_day_date']} ({stats['busiest_day_flights']} lotów)\n"
-        f"- Łączny czas oczekiwania między lotami tego samego dnia: {stats['total_wait_hours']}h\n"
-        f"- Liczba dni lotnych: {stats['flight_days']}\n"
-        f"- Najdłuższa przerwa między lotami: {stats['longest_gap_days']} dni\n\n"
-        f"Odpowiedz TYLKO w formacie JSON (bez markdown):\n"
-        f'{{"stats": [{{"title": "...", "value": "...", "comment": "..."}}, ...]}}'
+        "You are a witty, warm commentator on glider flying. You are given a "
+        "pilot's raw flight log. Study the data, find the funny, surprising, "
+        "endearing or oddly specific patterns hiding in it, and invent your own "
+        "fun statistics from what you discover.\n\n"
+        f"Generate exactly 8 fun stats, written {lang_instruction}. Make each one "
+        "genuinely derived from THIS pilot's data — pick different angles "
+        "(favourite aircraft, launch habits, airfields, timing quirks, loyal "
+        "winch operators or instructors, marathon days, dry spells, money spent, "
+        "landing counts, whatever the numbers suggest). Do not just restate a "
+        "single obvious total eight times; be creative and varied.\n\n"
+        "Each stat must have:\n"
+        "- title: a short punchy label (max 5 words)\n"
+        "- value: a number or short phrase (the headline figure)\n"
+        "- comment: one warm, funny sentence. Reference real gliding culture. "
+        "Be kind, never mean.\n\n"
+        "Always compute values yourself from the data below — do not make up "
+        "numbers that the data does not support.\n\n"
+        f"Pilot totals (career-wide): {total_flights} flights, "
+        f"{totals.get('total_hours', 0)}h {totals.get('total_minutes', 0)}min "
+        f"airborne, {totals.get('flight_days', 0)} flying days, "
+        f"{totals.get('total_cost', 0)} zł spent.\n\n"
+        f"{scope_note}"
+        "Flight log (CSV; times HH:MM, mins = flight minutes, launch e.g. "
+        "winch/aerotow, price in zł):\n"
+        f"{csv_block}\n\n"
+        "Respond with ONLY JSON (no markdown, no prose):\n"
+        '{"stats": [{"title": "...", "value": "...", "comment": "..."}, ...]}'
     )
 
 
@@ -261,11 +284,14 @@ def resolve_api_key(db: Session, user_id: uuid.UUID) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def generate_fun_stats(
-    stats: dict,
+    data: dict,
     language: str = 'pl',
     api_key: Optional[str] = None,
 ) -> tuple[list, str]:
     """Generate humorous stats via OpenRouter. Returns (stats_list, model_used).
+
+    ``data`` is the raw flight data from :func:`collect_raw_flights`; the model
+    derives its own stats from it.
 
     Strategy:
     1. Try the preferred creative model (paid — the user's own key).
@@ -278,7 +304,7 @@ def generate_fun_stats(
         logger.warning('fun_stats: no OpenRouter API key available, skipping generation')
         return [], ''
 
-    prompt = build_fun_stats_prompt(stats, language)
+    prompt = build_fun_stats_prompt(data, language)
 
     def _call(body: dict) -> tuple[list, str]:
         logger.info('fun_stats: calling OpenRouter model=%s', body['model'])
