@@ -122,10 +122,6 @@
 
 /* ── Refresh button ─────────────────────────────────────────────────────── */
 .fun-actions { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-.fun-cooldown {
-    font-size: 0.78rem;
-    color: var(--gl-muted);
-}
 
 /* ── Alert / error ──────────────────────────────────────────────────────── */
 .fun-alert {
@@ -150,7 +146,6 @@
         <i class="fas fa-wand-magic-sparkles"></i>
         <span data-i18n="logbook.fun_stats.refresh">Regenerate</span>
     </button>
-    <span id="cooldown-label" class="fun-cooldown" style="display:none"></span>
 </div>
 
 <!-- Alerts -->
@@ -216,7 +211,6 @@
     const elHint      = document.getElementById('generating-hint');
     const elFooter    = document.getElementById('fun-footer');
     const elAlert     = document.getElementById('fun-alert');
-    const elCooldown  = document.getElementById('cooldown-label');
     const btnRefresh  = document.getElementById('btn-refresh');
 
     // ── State helpers ─────────────────────────────────────────────────────
@@ -307,7 +301,6 @@
                     stopPolling();
                     renderStats(res.data.stats, res.data.generated_at, res.data.model_used);
                     btnRefresh.disabled = false;
-                    applyCooldown(res.data.generated_at);
                 } else if (res.data.error) {
                     stopPolling();
                     hideSkeleton();
@@ -330,33 +323,10 @@
             });
     }
 
-    // ── Cooldown display ──────────────────────────────────────────────────
-    function applyCooldown(generatedIso) {
-        const generatedMs = new Date(generatedIso).getTime();
-        const expiresMs   = generatedMs + 24 * 3600 * 1000;
-        const nowMs       = Date.now();
-        const secsLeft    = Math.floor((expiresMs - nowMs) / 1000);
-
-        if (secsLeft > 0) {
-            btnRefresh.disabled = true;
-            const h = Math.floor(secsLeft / 3600);
-            const m = Math.floor((secsLeft % 3600) / 60);
-            const timeStr = (h > 0 ? h + 'h ' : '') + m + 'min';
-            const label = t('logbook.fun_stats.refresh_unavail', 'Available again in {time}')
-                            .replace('{time}', timeStr);
-            elCooldown.textContent  = label;
-            elCooldown.style.display = 'inline';
-        } else {
-            btnRefresh.disabled      = false;
-            elCooldown.style.display = 'none';
-        }
-    }
-
     // ── Refresh trigger ───────────────────────────────────────────────────
     window.triggerRefresh = function () {
         hideAlert();
         btnRefresh.disabled = true;
-        elCooldown.style.display = 'none';
         showSkeleton();
         stopPolling();
 
@@ -367,24 +337,7 @@
         })
             .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
             .then(function (res) {
-                if (res.status === 429) {
-                    hideSkeleton();
-                    btnRefresh.disabled = false;
-                    showAlert(res.data.message || t('logbook.fun_stats.error', 'Too many requests.'), 'info');
-                    if (res.data.next_available) {
-                        // recompute from server's next_available
-                        const secsLeft = Math.max(0,
-                            Math.floor((new Date(res.data.next_available).getTime() - Date.now()) / 1000)
-                        );
-                        const h = Math.floor(secsLeft / 3600);
-                        const m = Math.floor((secsLeft % 3600) / 60);
-                        const timeStr = (h > 0 ? h + 'h ' : '') + m + 'min';
-                        const label = t('logbook.fun_stats.refresh_unavail', 'Available again in {time}')
-                                        .replace('{time}', timeStr);
-                        elCooldown.textContent  = label;
-                        elCooldown.style.display = 'inline';
-                    }
-                } else if (res.data.message === 'generating') {
+                if (res.data.message === 'generating') {
                     startPolling();
                 } else {
                     hideSkeleton();
@@ -411,7 +364,6 @@
                     hideSkeleton();
                     renderStats(res.data.stats, res.data.generated_at, res.data.model_used);
                     btnRefresh.disabled = false;
-                    applyCooldown(res.data.generated_at);
                 } else if (res.data.error) {
                     hideSkeleton();
                     btnRefresh.disabled = false;

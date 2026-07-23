@@ -44,23 +44,7 @@ def fun_stats_get():
 @logbook_bp.route('/api/stats/fun/refresh', methods=['POST'])
 @login_required
 def fun_stats_refresh():
-    """Trigger (re)generation of fun stats; rate-limited to once per 24 h."""
-    db = get_db()
-    cache = db.query(FunStatsCache).filter_by(user_id=current_user.id).first()
-    if cache:
-        age = datetime.now(timezone.utc) - cache.generated_at
-        # Don't rate-limit if the previous attempt errored out
-        if age < timedelta(hours=_CACHE_TTL_HOURS) and cache.model_used != _ERROR_SENTINEL:
-            seconds_left = _CACHE_TTL_HOURS * 3600 - age.total_seconds()
-            hours_left   = int(seconds_left // 3600)
-            minutes_left = int((seconds_left % 3600) // 60)
-            next_at = (cache.generated_at + timedelta(hours=_CACHE_TTL_HOURS)).isoformat()
-            return jsonify({
-                'error':          'too_soon',
-                'message':        f'Możesz wygenerować ponownie za {hours_left}h {minutes_left}min',
-                'next_available': next_at,
-            }), 429
-
+    """Trigger (re)generation of fun stats — no rate limit; users may regenerate freely."""
     language = current_user.preferred_language or 'pl'
     user_id  = current_user.id
     threading.Thread(
